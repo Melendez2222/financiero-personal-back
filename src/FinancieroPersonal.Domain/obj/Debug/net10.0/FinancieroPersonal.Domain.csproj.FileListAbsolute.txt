@@ -1,0 +1,11 @@
+C:\REPOS-EXTER\CONTABILIDAD-PERSONAL\financiero-personal-back\src\FinancieroPersonal.Domain\bin\Debug\net10.0\FinancieroPersonal.Domain.deps.json
+C:\REPOS-EXTER\CONTABILIDAD-PERSONAL\financiero-personal-back\src\FinancieroPersonal.Domain\bin\Debug\net10.0\FinancieroPersonal.Domain.dll
+C:\REPOS-EXTER\CONTABILIDAD-PERSONAL\financiero-personal-back\src\FinancieroPersonal.Domain\bin\Debug\net10.0\FinancieroPersonal.Domain.pdb
+C:\REPOS-EXTER\CONTABILIDAD-PERSONAL\financiero-personal-back\src\FinancieroPersonal.Domain\obj\Debug\net10.0\FinancieroPersonal.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\REPOS-EXTER\CONTABILIDAD-PERSONAL\financiero-personal-back\src\FinancieroPersonal.Domain\obj\Debug\net10.0\FinancieroPersonal.Domain.AssemblyInfoInputs.cache
+C:\REPOS-EXTER\CONTABILIDAD-PERSONAL\financiero-personal-back\src\FinancieroPersonal.Domain\obj\Debug\net10.0\FinancieroPersonal.Domain.AssemblyInfo.cs
+C:\REPOS-EXTER\CONTABILIDAD-PERSONAL\financiero-personal-back\src\FinancieroPersonal.Domain\obj\Debug\net10.0\FinancieroPersonal.Domain.csproj.CoreCompileInputs.cache
+C:\REPOS-EXTER\CONTABILIDAD-PERSONAL\financiero-personal-back\src\FinancieroPersonal.Domain\obj\Debug\net10.0\FinancieroPersonal.Domain.dll
+C:\REPOS-EXTER\CONTABILIDAD-PERSONAL\financiero-personal-back\src\FinancieroPersonal.Domain\obj\Debug\net10.0\refint\FinancieroPersonal.Domain.dll
+C:\REPOS-EXTER\CONTABILIDAD-PERSONAL\financiero-personal-back\src\FinancieroPersonal.Domain\obj\Debug\net10.0\FinancieroPersonal.Domain.pdb
+C:\REPOS-EXTER\CONTABILIDAD-PERSONAL\financiero-personal-back\src\FinancieroPersonal.Domain\obj\Debug\net10.0\ref\FinancieroPersonal.Domain.dll
