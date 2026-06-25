@@ -1,6 +1,0 @@
-@financiero_personal_HostAddress = http://localhost:5259
-
-GET {{financiero_personal_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

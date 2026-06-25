@@ -1,0 +1,20 @@
+# Blueprint de Render. Crea el web service desde este repo.
+# Las variables marcadas con sync:false se completan a mano en el dashboard
+# (son secretas o dependen de URLs que se conocen tras desplegar).
+services:
+  - type: web
+    name: financiero-personal-api
+    runtime: docker
+    plan: free
+    region: ohio            # usa la MISMA región que el proyecto de Neon
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true        # redeploy en cada push a main
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__Default
+        sync: false         # connection string .NET de Neon (SSL Mode=Require)
+      - key: Jwt__Key
+        sync: false         # secreto fuerte NUEVO (no reusar el dev del repo)
+      - key: Cors__Origins__0
+        sync: false         # https://<proyecto>.pages.dev (tras desplegar el front)

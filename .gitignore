@@ -1,0 +1,27 @@
+# ---- .NET ----
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+project.lock.json
+artifacts/
+
+# ---- Visual Studio / Rider ----
+.vs/
+.vscode/
+.idea/
+*.swp
+
+# ---- Sistema ----
+.DS_Store
+Thumbs.db
+
+# ---- Runtime / logs ----
+*.log
+
+# Nota: appsettings*.json SÍ se versionan (se necesitan en la imagen Docker;
+# los secretos de producción se inyectan por variables de entorno en Render).

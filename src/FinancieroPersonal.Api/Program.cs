@@ -13,6 +13,12 @@ using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
+// Render (y otros PaaS) inyectan el puerto vía la variable PORT.
+// En local no existe, así que se sigue usando launchSettings (5080).
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port))
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
 const string CorsPolicy = "frontend";
 var corsOrigins = config.GetSection("Cors:Origins").Get<string[]>()
                   ?? ["http://localhost:5173", "http://localhost:5174"];

@@ -1,0 +1,21 @@
+# Artefactos de compilación (se reconstruyen dentro de la imagen)
+**/bin/
+**/obj/
+
+# Config de desarrollo (no debe ir a producción)
+**/appsettings.Development.json
+docker-compose.yml
+
+# Plantilla basura (scaffold dotnet new webapi, la app real está en src/)
+financiero-personal/
+
+# Control de versiones / IDE
+.git/
+.gitignore
+.gitattributes
+.vs/
+.vscode/
+.idea/
+
+# Docs
+README.md
