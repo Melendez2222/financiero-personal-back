@@ -15,12 +15,6 @@ public static class DbSeeder
 
     private static async Task SeedUsuariosAsync(AppDbContext db, IPasswordHasher hasher, CancellationToken ct)
     {
-        // Elimina los usuarios demo antiguos si existen.
-        var demo = await db.Usuarios
-            .Where(u => u.Email == "ana@correo.com" || u.Email == "luis@correo.com")
-            .ToListAsync(ct);
-        if (demo.Count > 0) db.Usuarios.RemoveRange(demo);
-
         var reales = new[]
         {
             ("cristhian.melendez2711@gmail.com", "Cristhian", "Meléndez"),

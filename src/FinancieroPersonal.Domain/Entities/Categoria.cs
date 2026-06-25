@@ -2,11 +2,14 @@ using FinancieroPersonal.Domain.Enums;
 
 namespace FinancieroPersonal.Domain.Entities;
 
-public class Categoria
+public class Categoria : ISoftDelete
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Nombre { get; set; } = string.Empty;
     public Tipo Tipo { get; set; }
+
+    /// <summary>Solo deudas: etiqueta del tipo de deuda (préstamo / línea de crédito). Informativo.</summary>
+    public TipoDeuda? TipoDeuda { get; set; }
 
     /// <summary>Presupuesto/cuota mensual (fuente única, global).</summary>
     public decimal Presupuesto { get; set; }
@@ -30,4 +33,7 @@ public class Categoria
     /// <summary>Activador: si está activa se aplica a los periodos nuevos.</summary>
     public bool Activo { get; set; } = true;
     public int Orden { get; set; }
+
+    public bool Eliminado { get; set; }
+    public DateTime? EliminadoEn { get; set; }
 }

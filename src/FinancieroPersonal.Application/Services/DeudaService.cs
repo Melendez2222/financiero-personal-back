@@ -25,7 +25,9 @@ public class DeudaService(IAppDbContext db)
                 g => g.Key,
                 g => (
                     Capital: g.Sum(m => m.MontoCapital ?? m.Monto),
-                    Interes: g.Sum(m => m.Monto - (m.MontoCapital ?? m.Monto))));
+                    Interes: g.Sum(m => m.Monto - (m.MontoCapital ?? m.Monto)),
+                    // Cuotas pagadas = abonos marcados como cuota regular (los extra no cuentan).
+                    Cuotas: g.Count(m => m.EsCuota)));
 
         return deudas.Select(c =>
         {
@@ -36,7 +38,8 @@ public class DeudaService(IAppDbContext db)
             decimal? pct = c.MontoTotal is { } t && t > 0 ? Calc.Round2(Math.Min(100, (capitalPagado / t) * 100)) : null;
             return new DeudaDto(
                 c.Id, c.Nombre, c.Emoji, c.FechaVencimiento, c.Presupuesto, c.CuotasRestantes,
-                c.MontoTotal, c.CapitalPorCuota, capitalPagado, interesPagado, saldo, pct, c.Activo);
+                c.MontoTotal, c.CapitalPorCuota, c.TipoDeuda, capitalPagado, interesPagado, stats.Cuotas,
+                saldo, pct, c.Activo);
         }).ToList();
     }
 }

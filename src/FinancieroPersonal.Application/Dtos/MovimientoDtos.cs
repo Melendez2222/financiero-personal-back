@@ -11,6 +11,7 @@ public record MovimientoDto(
     DateOnly Fecha,
     decimal Monto,
     decimal? MontoCapital,
+    bool EsCuota,
     string Nota,
     Guid? UsuarioId);
 
@@ -22,6 +23,7 @@ public record CrearMovimientoRequest(
     DateOnly Fecha,
     decimal Monto,
     decimal? MontoCapital,
+    bool? EsCuota,
     string? Nota,
     Guid? UsuarioId);
 
@@ -32,5 +34,6 @@ public record ActualizarMovimientoRequest(
     DateOnly? Fecha,
     decimal? Monto,
     decimal? MontoCapital,
+    bool? EsCuota,
     string? Nota,
     Guid? UsuarioId);

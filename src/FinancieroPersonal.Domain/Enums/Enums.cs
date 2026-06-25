@@ -25,3 +25,9 @@ public enum EstadoPeriodo
     Iniciado,
     Cerrado,
 }
+
+public enum TipoDeuda
+{
+    Prestamo,
+    LineaCredito,
+}

@@ -57,6 +57,7 @@ public class MovimientoService(IAppDbContext db)
             Monto = req.Monto,
             // Solo las deudas guardan el desglose capital/interés; el resto, null.
             MontoCapital = req.Tipo == Tipo.Deuda ? req.MontoCapital : null,
+            EsCuota = req.EsCuota ?? true,
             Nota = req.Nota ?? string.Empty,
         };
         db.Movimientos.Add(movimiento);
@@ -76,6 +77,7 @@ public class MovimientoService(IAppDbContext db)
         m.UsuarioId = req.UsuarioId;
         // Solo deudas conservan el desglose capital/interés.
         m.MontoCapital = m.Tipo == Tipo.Deuda ? req.MontoCapital : null;
+        if (req.EsCuota is not null) m.EsCuota = req.EsCuota.Value;
 
         if (m.Tipo == Tipo.Situacional)
         {
@@ -96,7 +98,8 @@ public class MovimientoService(IAppDbContext db)
     {
         var m = await db.Movimientos.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (m is null) return;
-        db.Movimientos.Remove(m);
+        m.Eliminado = true;
+        m.EliminadoEn = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
     }
 }

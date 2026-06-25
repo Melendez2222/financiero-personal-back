@@ -29,11 +29,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(x => x.Nombre).HasMaxLength(120);
             e.Property(x => x.Tipo).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.TipoDeuda).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.Presupuesto).HasPrecision(18, 2);
             e.Property(x => x.MontoTotal).HasPrecision(18, 2);
             e.Property(x => x.CapitalPorCuota).HasPrecision(18, 2);
             e.Property(x => x.Emoji).HasMaxLength(16);
             e.Property(x => x.FechaVencimiento).HasMaxLength(8);
+            e.HasQueryFilter(x => !x.Eliminado);
         });
 
         b.Entity<Periodo>(e =>
@@ -41,7 +43,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Moneda).HasMaxLength(8);
             e.Property(x => x.Estado).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.BalanceInicial).HasPrecision(18, 2);
-            e.HasIndex(x => new { x.Anio, x.Mes }).IsUnique();
+            // Índice único parcial: un periodo eliminado (lógico) no bloquea recrear ese mes.
+            e.HasIndex(x => new { x.Anio, x.Mes }).IsUnique().HasFilter("\"Eliminado\" = false");
+            e.HasQueryFilter(x => !x.Eliminado);
         });
 
         b.Entity<PeriodoCategoria>(e =>
@@ -55,11 +59,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Tipo).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.Monto).HasPrecision(18, 2);
             e.Property(x => x.MontoCapital).HasPrecision(18, 2);
+            e.Property(x => x.EsCuota).HasDefaultValue(true);
             e.Property(x => x.Nota).HasMaxLength(500);
             e.Property(x => x.Concepto).HasMaxLength(200);
             e.HasIndex(x => x.PeriodoId);
             e.HasIndex(x => x.CategoriaId);
             e.HasIndex(x => x.UsuarioId);
+            e.HasQueryFilter(x => !x.Eliminado);
         });
 
         b.Entity<MetaAhorro>(e =>

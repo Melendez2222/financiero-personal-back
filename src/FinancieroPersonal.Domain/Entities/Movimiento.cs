@@ -3,7 +3,7 @@ using FinancieroPersonal.Domain.Enums;
 namespace FinancieroPersonal.Domain.Entities;
 
 /// <summary>Movimiento concreto (transacción). Alimenta los totales "actual".</summary>
-public class Movimiento
+public class Movimiento : ISoftDelete
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid PeriodoId { get; set; }
@@ -27,5 +27,14 @@ public class Movimiento
     /// Null = el Monto completo reduce el capital (deudas sin interés y back-compat).
     /// </summary>
     public decimal? MontoCapital { get; set; }
+
+    /// <summary>
+    /// Solo abonos a deuda: true = cuota regular (cuenta para "cuotas pagadas");
+    /// false = abono extra a capital. Default true (back-compat y pagos normales).
+    /// </summary>
+    public bool EsCuota { get; set; } = true;
     public string Nota { get; set; } = string.Empty;
+
+    public bool Eliminado { get; set; }
+    public DateTime? EliminadoEn { get; set; }
 }

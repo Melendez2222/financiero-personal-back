@@ -8,13 +8,13 @@ public static class Mappings
     public static UsuarioDto ToDto(this Usuario u) => new(u.Id, u.Email, u.Nombre, u.Apellidos);
 
     public static CategoriaDto ToDto(this Categoria c) =>
-        new(c.Id, c.Nombre, c.Tipo, c.Presupuesto, c.Emoji, c.FechaVencimiento, c.CuotasRestantes, c.MontoTotal, c.CapitalPorCuota, c.Activo, c.Orden);
+        new(c.Id, c.Nombre, c.Tipo, c.Presupuesto, c.Emoji, c.FechaVencimiento, c.CuotasRestantes, c.MontoTotal, c.CapitalPorCuota, c.TipoDeuda, c.Activo, c.Orden);
 
     public static PeriodoDto ToDto(this Periodo p) =>
         new(p.Id, p.Anio, p.Mes, p.FechaInicio, p.FechaFin, p.Moneda, p.BalanceInicial, p.Estado);
 
     public static MovimientoDto ToDto(this Movimiento m) =>
-        new(m.Id, m.PeriodoId, m.CategoriaId, m.Concepto, m.Tipo, m.Fecha, m.Monto, m.MontoCapital, m.Nota, m.UsuarioId);
+        new(m.Id, m.PeriodoId, m.CategoriaId, m.Concepto, m.Tipo, m.Fecha, m.Monto, m.MontoCapital, m.EsCuota, m.Nota, m.UsuarioId);
 
     public static MetaDto ToDto(this MetaAhorro m) =>
         new(m.Id, m.Nombre, m.Emoji, m.MontoObjetivo, m.AporteMensual, m.MontoAcumulado, m.AporteMes,

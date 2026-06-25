@@ -42,6 +42,7 @@ public class CategoriaService(IAppDbContext db)
             CuotasRestantes = req.CuotasRestantes,
             MontoTotal = req.MontoTotal,
             CapitalPorCuota = req.CapitalPorCuota,
+            TipoDeuda = req.TipoDeuda,
             Activo = req.Activo ?? true,
             Orden = ordenMax + 1,
         };
@@ -64,6 +65,7 @@ public class CategoriaService(IAppDbContext db)
         // Asignación directa para permitir desactivar el interés (capitalPorCuota = null).
         // El diálogo de categoría siempre envía el objeto completo.
         c.CapitalPorCuota = req.CapitalPorCuota;
+        c.TipoDeuda = req.TipoDeuda;
         if (req.Activo is not null) c.Activo = req.Activo.Value;
 
         await db.SaveChangesAsync(ct);
@@ -89,9 +91,10 @@ public class CategoriaService(IAppDbContext db)
             throw AppException.Conflict("tiene_movimientos",
                 "No se puede eliminar: tiene movimientos. Mejor desactívala.");
 
-        var snaps = await db.PeriodoCategorias.Where(pc => pc.CategoriaId == id).ToListAsync(ct);
-        db.PeriodoCategorias.RemoveRange(snaps);
-        db.Categorias.Remove(c);
+        // Borrado lógico: el snapshot (PeriodoCategoria) se conserva; el filtro global de
+        // Categoria ya excluye esta categoría de los resúmenes.
+        c.Eliminado = true;
+        c.EliminadoEn = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
     }
 }

@@ -99,9 +99,10 @@ public class PeriodoService(IAppDbContext db)
             throw AppException.Conflict("periodo_con_movimientos",
                 "El mes tiene movimientos y no se puede borrar.");
 
-        var snaps = await db.PeriodoCategorias.Where(pc => pc.PeriodoId == id).ToListAsync(ct);
-        db.PeriodoCategorias.RemoveRange(snaps);
-        db.Periodos.Remove(p);
+        // Borrado lógico: el snapshot (PeriodoCategoria) se conserva para auditoría; al recrear
+        // el mes se genera un periodo nuevo (otro Id) con su propio snapshot.
+        p.Eliminado = true;
+        p.EliminadoEn = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
     }
 
