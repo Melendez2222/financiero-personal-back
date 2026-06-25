@@ -33,4 +33,11 @@ public class PeriodosController(PeriodoService service) : ControllerBase
     [HttpGet("{id:guid}/resumen")]
     public async Task<ActionResult<ResumenPeriodoDto>> Resumen(Guid id, CancellationToken ct)
         => Ok(await service.ResumenAsync(id, ct));
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await service.EliminarAsync(id, ct);
+        return NoContent();
+    }
 }

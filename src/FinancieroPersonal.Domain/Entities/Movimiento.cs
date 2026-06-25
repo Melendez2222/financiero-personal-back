@@ -21,5 +21,11 @@ public class Movimiento
 
     /// <summary>Siempre positivo; el signo lo deriva la UI según el tipo.</summary>
     public decimal Monto { get; set; }
+
+    /// <summary>
+    /// Solo abonos a deuda: porción de este abono que reduce el capital de la deuda.
+    /// Null = el Monto completo reduce el capital (deudas sin interés y back-compat).
+    /// </summary>
+    public decimal? MontoCapital { get; set; }
     public string Nota { get; set; } = string.Empty;
 }

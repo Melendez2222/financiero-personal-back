@@ -89,6 +89,22 @@ public class PeriodoService(IAppDbContext db)
         return await ConstruirResumenAsync(p, ct);
     }
 
+    public async Task EliminarAsync(Guid id, CancellationToken ct)
+    {
+        var p = await db.Periodos.FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw AppException.NotFound("Periodo no encontrado.");
+
+        var tieneMovs = await db.Movimientos.AnyAsync(m => m.PeriodoId == id, ct);
+        if (tieneMovs)
+            throw AppException.Conflict("periodo_con_movimientos",
+                "El mes tiene movimientos y no se puede borrar.");
+
+        var snaps = await db.PeriodoCategorias.Where(pc => pc.PeriodoId == id).ToListAsync(ct);
+        db.PeriodoCategorias.RemoveRange(snaps);
+        db.Periodos.Remove(p);
+        await db.SaveChangesAsync(ct);
+    }
+
     /// <summary>Crea el snapshot de categorías activas para un periodo (si aún no existe).</summary>
     private async Task AgregarSnapshotAsync(Guid periodoId, CancellationToken ct)
     {

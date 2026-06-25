@@ -9,7 +9,9 @@ public record DeudaDto(
     decimal CuotaMensual,
     int? CuotasRestantes,
     decimal? MontoTotal,
+    decimal? CapitalPorCuota,
     decimal TotalPagado,
+    decimal TotalInteres,
     decimal? SaldoRestante,
     decimal? Pct,
     bool Activo);

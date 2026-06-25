@@ -11,6 +11,7 @@ public record CategoriaDto(
     string? FechaVencimiento,
     int? CuotasRestantes,
     decimal? MontoTotal,
+    decimal? CapitalPorCuota,
     bool Activo,
     int Orden);
 
@@ -22,6 +23,7 @@ public record CrearCategoriaRequest(
     string? FechaVencimiento,
     int? CuotasRestantes,
     decimal? MontoTotal,
+    decimal? CapitalPorCuota,
     bool? Activo);
 
 public record ActualizarCategoriaRequest(
@@ -31,6 +33,7 @@ public record ActualizarCategoriaRequest(
     string? FechaVencimiento,
     int? CuotasRestantes,
     decimal? MontoTotal,
+    decimal? CapitalPorCuota,
     bool? Activo);
 
 public record SetActivoRequest(bool Activo);

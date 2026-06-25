@@ -31,6 +31,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Tipo).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.Presupuesto).HasPrecision(18, 2);
             e.Property(x => x.MontoTotal).HasPrecision(18, 2);
+            e.Property(x => x.CapitalPorCuota).HasPrecision(18, 2);
             e.Property(x => x.Emoji).HasMaxLength(16);
             e.Property(x => x.FechaVencimiento).HasMaxLength(8);
         });
@@ -53,6 +54,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(x => x.Tipo).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.Monto).HasPrecision(18, 2);
+            e.Property(x => x.MontoCapital).HasPrecision(18, 2);
             e.Property(x => x.Nota).HasMaxLength(500);
             e.Property(x => x.Concepto).HasMaxLength(200);
             e.HasIndex(x => x.PeriodoId);

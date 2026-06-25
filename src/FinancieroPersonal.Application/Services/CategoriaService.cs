@@ -41,6 +41,7 @@ public class CategoriaService(IAppDbContext db)
             FechaVencimiento = req.FechaVencimiento,
             CuotasRestantes = req.CuotasRestantes,
             MontoTotal = req.MontoTotal,
+            CapitalPorCuota = req.CapitalPorCuota,
             Activo = req.Activo ?? true,
             Orden = ordenMax + 1,
         };
@@ -60,6 +61,9 @@ public class CategoriaService(IAppDbContext db)
         if (req.FechaVencimiento is not null) c.FechaVencimiento = req.FechaVencimiento;
         if (req.CuotasRestantes is not null) c.CuotasRestantes = req.CuotasRestantes;
         if (req.MontoTotal is not null) c.MontoTotal = req.MontoTotal;
+        // Asignación directa para permitir desactivar el interés (capitalPorCuota = null).
+        // El diálogo de categoría siempre envía el objeto completo.
+        c.CapitalPorCuota = req.CapitalPorCuota;
         if (req.Activo is not null) c.Activo = req.Activo.Value;
 
         await db.SaveChangesAsync(ct);

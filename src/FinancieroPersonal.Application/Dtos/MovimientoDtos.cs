@@ -10,6 +10,7 @@ public record MovimientoDto(
     Tipo Tipo,
     DateOnly Fecha,
     decimal Monto,
+    decimal? MontoCapital,
     string Nota,
     Guid? UsuarioId);
 
@@ -20,6 +21,7 @@ public record CrearMovimientoRequest(
     Tipo Tipo,
     DateOnly Fecha,
     decimal Monto,
+    decimal? MontoCapital,
     string? Nota,
     Guid? UsuarioId);
 
@@ -29,5 +31,6 @@ public record ActualizarMovimientoRequest(
     Tipo? Tipo,
     DateOnly? Fecha,
     decimal? Monto,
+    decimal? MontoCapital,
     string? Nota,
     Guid? UsuarioId);
