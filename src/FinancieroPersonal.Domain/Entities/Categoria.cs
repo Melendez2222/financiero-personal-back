@@ -30,6 +30,9 @@ public class Categoria : ISoftDelete
     /// </summary>
     public decimal? CapitalPorCuota { get; set; }
 
+    /// <summary>Solo ingresos: persona por defecto a la que se atribuye al registrar (ej. de quién es la quincena). Null = sin asignar.</summary>
+    public Guid? UsuarioId { get; set; }
+
     /// <summary>Activador: si está activa se aplica a los periodos nuevos.</summary>
     public bool Activo { get; set; } = true;
     public int Orden { get; set; }

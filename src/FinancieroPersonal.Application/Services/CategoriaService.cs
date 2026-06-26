@@ -43,6 +43,7 @@ public class CategoriaService(IAppDbContext db)
             MontoTotal = req.MontoTotal,
             CapitalPorCuota = req.CapitalPorCuota,
             TipoDeuda = req.TipoDeuda,
+            UsuarioId = req.UsuarioId,
             Activo = req.Activo ?? true,
             Orden = ordenMax + 1,
         };
@@ -66,6 +67,8 @@ public class CategoriaService(IAppDbContext db)
         // El diálogo de categoría siempre envía el objeto completo.
         c.CapitalPorCuota = req.CapitalPorCuota;
         c.TipoDeuda = req.TipoDeuda;
+        // Asignación directa: el diálogo manda el objeto completo, así se puede limpiar la persona.
+        c.UsuarioId = req.UsuarioId;
         if (req.Activo is not null) c.Activo = req.Activo.Value;
 
         await db.SaveChangesAsync(ct);

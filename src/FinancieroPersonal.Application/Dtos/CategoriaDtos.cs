@@ -13,6 +13,7 @@ public record CategoriaDto(
     decimal? MontoTotal,
     decimal? CapitalPorCuota,
     TipoDeuda? TipoDeuda,
+    Guid? UsuarioId,
     bool Activo,
     int Orden);
 
@@ -26,6 +27,7 @@ public record CrearCategoriaRequest(
     decimal? MontoTotal,
     decimal? CapitalPorCuota,
     TipoDeuda? TipoDeuda,
+    Guid? UsuarioId,
     bool? Activo);
 
 public record ActualizarCategoriaRequest(
@@ -37,6 +39,7 @@ public record ActualizarCategoriaRequest(
     decimal? MontoTotal,
     decimal? CapitalPorCuota,
     TipoDeuda? TipoDeuda,
+    Guid? UsuarioId,
     bool? Activo);
 
 public record SetActivoRequest(bool Activo);

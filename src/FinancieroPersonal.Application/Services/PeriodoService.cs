@@ -139,9 +139,18 @@ public class PeriodoService(IAppDbContext db)
         var snapshot = await db.PeriodoCategorias.Where(pc => pc.PeriodoId == periodo.Id).ToListAsync(ct);
         var movs = await db.Movimientos.Where(m => m.PeriodoId == periodo.Id).ToListAsync(ct);
 
+        // Unión del snapshot + categorías activas que se crearon DESPUÉS de tomarlo.
+        // El snapshot conserva los montos/membresía congelados del mes (desactivar no borra la
+        // línea en curso); además, una categoría activa nueva aparece de inmediato en el mes
+        // (con su presupuesto actual), sin tener que recrear el periodo.
+        var enSnapshot = snapshot.Select(pc => pc.CategoriaId).ToHashSet();
         List<(Categoria cat, decimal pres)> baseLineas = snapshot.Count > 0
             ? snapshot.Where(pc => catById.ContainsKey(pc.CategoriaId))
-                      .Select(pc => (catById[pc.CategoriaId], pc.MontoPresupuestado)).ToList()
+                      .Select(pc => (catById[pc.CategoriaId], pc.MontoPresupuestado))
+                      .Concat(categorias
+                          .Where(c => c.Activo && !enSnapshot.Contains(c.Id))
+                          .Select(c => (c, c.Presupuesto)))
+                      .ToList()
             : categorias.Where(c => c.Activo).Select(c => (c, c.Presupuesto)).ToList();
 
         var actualByCat = movs
