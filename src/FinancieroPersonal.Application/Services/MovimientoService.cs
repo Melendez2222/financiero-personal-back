@@ -75,8 +75,11 @@ public class MovimientoService(IAppDbContext db)
         if (req.Monto is not null) m.Monto = req.Monto.Value;
         if (req.Nota is not null) m.Nota = req.Nota;
         m.UsuarioId = req.UsuarioId;
-        // Solo deudas conservan el desglose capital/interés.
-        m.MontoCapital = m.Tipo == Tipo.Deuda ? req.MontoCapital : null;
+        // Solo deudas conservan el desglose capital/interés. Si el request NO trae MontoCapital
+        // (p.ej. edición desde el historial genérico de Gastos), se PRESERVA el existente: un null
+        // haría que el monto completo cuente como capital e inflaría el "capital recuperado".
+        if (m.Tipo == Tipo.Deuda) { if (req.MontoCapital is not null) m.MontoCapital = req.MontoCapital; }
+        else { m.MontoCapital = null; }
         if (req.EsCuota is not null) m.EsCuota = req.EsCuota.Value;
 
         if (m.Tipo == Tipo.Situacional)
