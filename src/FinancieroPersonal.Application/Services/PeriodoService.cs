@@ -201,8 +201,17 @@ public class PeriodoService(IAppDbContext db)
             situacionalesActual,
             Calc.Round2(gastoPres - gastoActual - situacionalesActual));
 
-        var disponible = Calc.Round2(
-            flujo.IngresosPresupuesto - flujo.FijosPresupuesto - flujo.DeudasPresupuesto - flujo.AhorrosPresupuesto);
+        // "Dinero disponible" realista: lo que tienes ahora (balance + ingresos recibidos − TODO lo
+        // ya pagado) menos lo que AÚN debes pagar de fijos, deudas y ahorros (pendiente = presupuesto
+        // − pagado, si es > 0). Los necesarios ya gastados cuentan como pagado; los pendientes no se
+        // reservan (son el gasto discrecional que este disponible representa).
+        decimal Pendiente(decimal pres, decimal act) => Math.Max(0, pres - act);
+        var tengoAhora = flujo.BalanceInicial + flujo.IngresosActual
+            - (flujo.FijosActual + flujo.NecesariosActual + flujo.DeudasActual + flujo.AhorrosActual + flujo.SituacionalesActual);
+        var porPagar = Pendiente(flujo.FijosPresupuesto, flujo.FijosActual)
+            + Pendiente(flujo.DeudasPresupuesto, flujo.DeudasActual)
+            + Pendiente(flujo.AhorrosPresupuesto, flujo.AhorrosActual);
+        var disponible = Calc.Round2(tengoAhora - porPagar);
 
         return new ResumenPeriodoDto(periodo.ToDto(), secciones, situacionales, flujo, disponible);
     }
