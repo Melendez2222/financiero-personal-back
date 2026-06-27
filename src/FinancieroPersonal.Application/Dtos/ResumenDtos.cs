@@ -10,7 +10,8 @@ public record LineaResumenDto(
     decimal Actual,
     decimal Queda,
     string? FechaVencimiento,
-    string? Emoji);
+    string? Emoji,
+    bool Activo);
 
 public record SeccionResumenDto(
     Tipo Tipo,

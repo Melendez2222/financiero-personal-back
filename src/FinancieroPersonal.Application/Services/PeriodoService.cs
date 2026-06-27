@@ -53,7 +53,7 @@ public class PeriodoService(IAppDbContext db)
             Estado = EstadoPeriodo.Borrador,
         };
         db.Periodos.Add(periodo);
-        await AgregarSnapshotAsync(periodo.Id, ct);
+        await AgregarSnapshotAsync(periodo, ct);
         await db.SaveChangesAsync(ct);
         return periodo.ToDto();
     }
@@ -76,7 +76,7 @@ public class PeriodoService(IAppDbContext db)
         var p = await db.Periodos.FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw AppException.NotFound("Periodo no encontrado.");
 
-        await AgregarSnapshotAsync(p.Id, ct);
+        await AgregarSnapshotAsync(p, ct);
         p.Estado = EstadoPeriodo.Iniciado;
         await db.SaveChangesAsync(ct);
         return p.ToDto();
@@ -106,23 +106,32 @@ public class PeriodoService(IAppDbContext db)
         await db.SaveChangesAsync(ct);
     }
 
-    /// <summary>Crea el snapshot de categorías activas para un periodo (si aún no existe).</summary>
-    private async Task AgregarSnapshotAsync(Guid periodoId, CancellationToken ct)
+    /// <summary>
+    /// Crea el snapshot de categorías activas Y vigentes para un periodo (si aún no existe).
+    /// Una categoría con vigencia (desde/hasta) solo entra si su rango cubre el mes del periodo.
+    /// </summary>
+    private async Task AgregarSnapshotAsync(Periodo periodo, CancellationToken ct)
     {
-        var yaTiene = await db.PeriodoCategorias.AnyAsync(pc => pc.PeriodoId == periodoId, ct);
+        var yaTiene = await db.PeriodoCategorias.AnyAsync(pc => pc.PeriodoId == periodo.Id, ct);
         if (yaTiene) return;
 
+        var inicioMes = periodo.FechaInicio;
         var activas = await db.Categorias.Where(c => c.Activo).ToListAsync(ct);
-        foreach (var c in activas)
+        foreach (var c in activas.Where(c => VigenteEn(c, inicioMes)))
         {
             db.PeriodoCategorias.Add(new PeriodoCategoria
             {
-                PeriodoId = periodoId,
+                PeriodoId = periodo.Id,
                 CategoriaId = c.Id,
                 MontoPresupuestado = c.Presupuesto,
             });
         }
     }
+
+    /// <summary>True si la vigencia de la categoría cubre el primer día del mes dado (null = sin límite).</summary>
+    private static bool VigenteEn(Categoria c, DateOnly inicioMes) =>
+        (c.VigenciaDesde is null || inicioMes >= c.VigenciaDesde)
+        && (c.VigenciaHasta is null || inicioMes <= c.VigenciaHasta);
 
     private async Task<decimal> BalanceFinalAsync(Periodo periodo, CancellationToken ct)
     {
@@ -152,15 +161,18 @@ public class PeriodoService(IAppDbContext db)
         // El snapshot conserva los montos/membresía congelados del mes (desactivar no borra la
         // línea en curso); además, una categoría activa nueva aparece de inmediato en el mes
         // (con su presupuesto actual), sin tener que recrear el periodo.
+        // La vigencia solo se aplica a las categorías que se añaden FUERA del snapshot (el snapshot
+        // es la verdad congelada del mes: si está ahí, pertenece al mes aunque su vigencia cambie luego).
+        var inicioMes = periodo.FechaInicio;
         var enSnapshot = snapshot.Select(pc => pc.CategoriaId).ToHashSet();
         List<(Categoria cat, decimal pres)> baseLineas = snapshot.Count > 0
             ? snapshot.Where(pc => catById.ContainsKey(pc.CategoriaId))
                       .Select(pc => (catById[pc.CategoriaId], pc.MontoPresupuestado))
                       .Concat(categorias
-                          .Where(c => c.Activo && !enSnapshot.Contains(c.Id))
+                          .Where(c => c.Activo && !enSnapshot.Contains(c.Id) && VigenteEn(c, inicioMes))
                           .Select(c => (c, c.Presupuesto)))
                       .ToList()
-            : categorias.Where(c => c.Activo).Select(c => (c, c.Presupuesto)).ToList();
+            : categorias.Where(c => c.Activo && VigenteEn(c, inicioMes)).Select(c => (c, c.Presupuesto)).ToList();
 
         // Vista por persona: el presupuesto también se acota a las categorías de esa persona.
         if (usuarioId != null)
@@ -176,14 +188,17 @@ public class PeriodoService(IAppDbContext db)
         foreach (var tipo in Enum.GetValues<Tipo>())
         {
             if (tipo == Tipo.Situacional) continue; // se maneja aparte (sin catálogo)
+            // Deudas: solo cuentan en el mes las que están activadas e iniciadas (EstadoDeuda.Iniciada).
+            // Las Pendiente/Suspendida/Saldada no inflan el presupuesto ni el actual del periodo.
             var lineas = baseLineas
-                .Where(b => b.cat.Tipo == tipo)
+                .Where(b => b.cat.Tipo == tipo
+                    && (tipo != Tipo.Deuda || b.cat.EstadoDeuda == EstadoDeuda.Iniciada))
                 .OrderBy(b => b.cat.Orden)
                 .Select(b =>
                 {
                     var actual = Calc.Round2(Actual(b.cat.Id));
                     return new LineaResumenDto(b.cat.Id, b.cat.Nombre, tipo, b.pres, actual,
-                        Calc.Round2(b.pres - actual), b.cat.FechaVencimiento, b.cat.Emoji);
+                        Calc.Round2(b.pres - actual), b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo);
                 })
                 .ToList();
 
@@ -214,22 +229,15 @@ public class PeriodoService(IAppDbContext db)
             situacionalesActual,
             Calc.Round2(gastoPres - gastoActual - situacionalesActual));
 
-        // "Dinero disponible" realista (proyección de fin de mes): lo que tienes ahora (balance +
-        // ingresos recibidos − TODO lo ya pagado), MÁS los ingresos que aún esperas recibir, MENOS lo
-        // que aún debes pagar de fijos/deudas/ahorros (pendiente = presupuesto − actual, si > 0). Así
-        // es simétrico: cuenta tanto lo que falta cobrar como lo que falta pagar. Los necesarios ya
-        // gastados cuentan como pagado; los pendientes no se reservan (son el gasto discrecional).
-        decimal Pendiente(decimal pres, decimal act) => Math.Max(0, pres - act);
+        // "Saldo disponible" = SALDO ACTUAL real: lo que tienes ahora = balance inicial + ingresos ya
+        // recibidos − TODO lo ya pagado (fijos/necesarios/deudas/ahorros/situacionales actuales). NO
+        // reserva compromisos pendientes; la proyección de fin de mes la calcula el frontend a partir
+        // del flujo + metasPorAportar.
         var tengoAhora = flujo.BalanceInicial + flujo.IngresosActual
             - (flujo.FijosActual + flujo.NecesariosActual + flujo.DeudasActual + flujo.AhorrosActual + flujo.SituacionalesActual);
-        var porRecibir = Pendiente(flujo.IngresosPresupuesto, flujo.IngresosActual);
-        // Reserva el presupuesto que falta por cubrir de TODOS los grupos activos (incl. necesarios).
-        var porPagar = Pendiente(flujo.FijosPresupuesto, flujo.FijosActual)
-            + Pendiente(flujo.NecesariosPresupuesto, flujo.NecesariosActual)
-            + Pendiente(flujo.DeudasPresupuesto, flujo.DeudasActual)
-            + Pendiente(flujo.AhorrosPresupuesto, flujo.AhorrosActual);
 
-        // Metas de ahorro activas: reservar el aporte mensual que aún no se ha cubierto ESTE mes
+        // Metas de ahorro activas: aporte mensual que aún no se ha cubierto ESTE mes (lo usa el front
+        // para la proyección secundaria). Solo en vista global (las metas son del hogar).
         // (aportes con fecha dentro del periodo). Solo en vista global (las metas son del hogar).
         decimal metasPorAportar = 0m;
         if (usuarioId == null)
@@ -244,7 +252,7 @@ public class PeriodoService(IAppDbContext db)
                 metasActivas.Sum(m => Math.Max(0m, m.AporteMensual - aportesMes.GetValueOrDefault(m.Id))));
         }
 
-        var disponible = Calc.Round2(tengoAhora + porRecibir - porPagar - metasPorAportar);
+        var disponible = Calc.Round2(tengoAhora);
 
         return new ResumenPeriodoDto(periodo.ToDto(), secciones, situacionales, flujo, disponible, metasPorAportar);
     }

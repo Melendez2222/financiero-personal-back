@@ -18,4 +18,5 @@ public record DeudaDto(
     int CuotasPagadas,
     decimal? SaldoRestante,
     decimal? Pct,
-    bool Activo);
+    bool Activo,
+    EstadoDeuda EstadoDeuda);

@@ -1,5 +1,6 @@
 using FinancieroPersonal.Application.Abstractions;
 using FinancieroPersonal.Domain.Entities;
+using FinancieroPersonal.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace FinancieroPersonal.Infrastructure.Persistence;
@@ -30,6 +31,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Nombre).HasMaxLength(120);
             e.Property(x => x.Tipo).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.TipoDeuda).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Cobertura).HasConversion<string>().HasMaxLength(20);
+            // Backfill de filas existentes a 'Iniciada' para preservar el comportamiento actual.
+            e.Property(x => x.EstadoDeuda).HasConversion<string>().HasMaxLength(20).HasDefaultValue(EstadoDeuda.Iniciada);
             e.Property(x => x.Presupuesto).HasPrecision(18, 2);
             e.Property(x => x.MontoTotal).HasPrecision(18, 2);
             e.Property(x => x.CapitalPorCuota).HasPrecision(18, 2);

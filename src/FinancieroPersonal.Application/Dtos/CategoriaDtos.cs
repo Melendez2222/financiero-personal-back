@@ -15,7 +15,11 @@ public record CategoriaDto(
     TipoDeuda? TipoDeuda,
     Guid? UsuarioId,
     bool Activo,
-    int Orden);
+    int Orden,
+    CoberturaIngreso? Cobertura,
+    DateOnly? VigenciaDesde,
+    DateOnly? VigenciaHasta,
+    EstadoDeuda EstadoDeuda);
 
 public record CrearCategoriaRequest(
     string Nombre,
@@ -28,7 +32,11 @@ public record CrearCategoriaRequest(
     decimal? CapitalPorCuota,
     TipoDeuda? TipoDeuda,
     Guid? UsuarioId,
-    bool? Activo);
+    bool? Activo,
+    CoberturaIngreso? Cobertura,
+    DateOnly? VigenciaDesde,
+    DateOnly? VigenciaHasta,
+    EstadoDeuda? EstadoDeuda);
 
 public record ActualizarCategoriaRequest(
     string? Nombre,
@@ -40,6 +48,14 @@ public record ActualizarCategoriaRequest(
     decimal? CapitalPorCuota,
     TipoDeuda? TipoDeuda,
     Guid? UsuarioId,
-    bool? Activo);
+    bool? Activo,
+    CoberturaIngreso? Cobertura,
+    DateOnly? VigenciaDesde,
+    DateOnly? VigenciaHasta,
+    EstadoDeuda? EstadoDeuda);
 
 public record SetActivoRequest(bool Activo);
+
+public record SetEstadoDeudaRequest(EstadoDeuda EstadoDeuda);
+
+public record SetCoberturaRequest(CoberturaIngreso? Cobertura);

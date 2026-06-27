@@ -44,6 +44,11 @@ public class CategoriaService(IAppDbContext db)
             CapitalPorCuota = req.CapitalPorCuota,
             TipoDeuda = req.TipoDeuda,
             UsuarioId = req.UsuarioId,
+            Cobertura = req.Cobertura,
+            VigenciaDesde = req.VigenciaDesde,
+            VigenciaHasta = req.VigenciaHasta,
+            // Una deuda nueva nace "Pendiente" (no iniciada); el resto de tipos no usa este campo.
+            EstadoDeuda = req.EstadoDeuda ?? (req.Tipo == Tipo.Deuda ? EstadoDeuda.Pendiente : EstadoDeuda.Iniciada),
             Activo = req.Activo ?? true,
             Orden = ordenMax + 1,
         };
@@ -67,9 +72,15 @@ public class CategoriaService(IAppDbContext db)
         // El diálogo de categoría siempre envía el objeto completo.
         c.CapitalPorCuota = req.CapitalPorCuota;
         c.TipoDeuda = req.TipoDeuda;
-        // Asignación directa: el diálogo manda el objeto completo, así se puede limpiar la persona.
+        // Asignación directa: el diálogo manda el objeto completo, así se puede limpiar la persona,
+        // la cobertura (quincena/fin de mes) y la vigencia.
         c.UsuarioId = req.UsuarioId;
+        c.Cobertura = req.Cobertura;
+        c.VigenciaDesde = req.VigenciaDesde;
+        c.VigenciaHasta = req.VigenciaHasta;
         if (req.Activo is not null) c.Activo = req.Activo.Value;
+        // EstadoDeuda solo se toca si viene (el cambio rápido va por SetEstadoDeudaAsync).
+        if (req.EstadoDeuda is not null) c.EstadoDeuda = req.EstadoDeuda.Value;
 
         await db.SaveChangesAsync(ct);
         return c.ToDto();
@@ -80,6 +91,26 @@ public class CategoriaService(IAppDbContext db)
         var c = await db.Categorias.FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw AppException.NotFound("Categoría no encontrada.");
         c.Activo = activo;
+        await db.SaveChangesAsync(ct);
+        return c.ToDto();
+    }
+
+    /// <summary>Cambio rápido del estado de una deuda (Pendiente/Iniciada/Suspendida/Saldada).</summary>
+    public async Task<CategoriaDto> SetEstadoDeudaAsync(Guid id, EstadoDeuda estado, CancellationToken ct)
+    {
+        var c = await db.Categorias.FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw AppException.NotFound("Categoría no encontrada.");
+        c.EstadoDeuda = estado;
+        await db.SaveChangesAsync(ct);
+        return c.ToDto();
+    }
+
+    /// <summary>Cambio rápido de la bolsa que cubre un gasto (quincena/fin de mes); null = sin asignar.</summary>
+    public async Task<CategoriaDto> SetCoberturaAsync(Guid id, CoberturaIngreso? cobertura, CancellationToken ct)
+    {
+        var c = await db.Categorias.FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw AppException.NotFound("Categoría no encontrada.");
+        c.Cobertura = cobertura;
         await db.SaveChangesAsync(ct);
         return c.ToDto();
     }

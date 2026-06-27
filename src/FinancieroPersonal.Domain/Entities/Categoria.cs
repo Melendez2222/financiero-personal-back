@@ -33,6 +33,24 @@ public class Categoria : ISoftDelete
     /// <summary>Solo ingresos: persona por defecto a la que se atribuye al registrar (ej. de quién es la quincena). Null = sin asignar.</summary>
     public Guid? UsuarioId { get; set; }
 
+    /// <summary>
+    /// Ingresos/Fijos/Necesarios: bolsa que cubre este movimiento (quincena o fin de mes).
+    /// Null = sin asignar. Solo organizativo, no afecta los cálculos del resumen.
+    /// </summary>
+    public CoberturaIngreso? Cobertura { get; set; }
+
+    /// <summary>
+    /// Vigencia: primer mes en que aplica la categoría (día 1). Null = sin límite inferior ("siempre").
+    /// Al crear/iniciar un mes, solo entran las categorías cuya vigencia cubre ese mes.
+    /// </summary>
+    public DateOnly? VigenciaDesde { get; set; }
+
+    /// <summary>Vigencia: último mes en que aplica la categoría (día 1). Null = sin límite superior ("siempre").</summary>
+    public DateOnly? VigenciaHasta { get; set; }
+
+    /// <summary>Solo deudas: estado del ciclo de vida (manual). Solo las Iniciadas cuentan en el mes.</summary>
+    public EstadoDeuda EstadoDeuda { get; set; } = EstadoDeuda.Iniciada;
+
     /// <summary>Activador: si está activa se aplica a los periodos nuevos.</summary>
     public bool Activo { get; set; } = true;
     public int Orden { get; set; }

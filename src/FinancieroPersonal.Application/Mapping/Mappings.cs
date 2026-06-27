@@ -8,7 +8,7 @@ public static class Mappings
     public static UsuarioDto ToDto(this Usuario u) => new(u.Id, u.Email, u.Nombre, u.Apellidos);
 
     public static CategoriaDto ToDto(this Categoria c) =>
-        new(c.Id, c.Nombre, c.Tipo, c.Presupuesto, c.Emoji, c.FechaVencimiento, c.CuotasRestantes, c.MontoTotal, c.CapitalPorCuota, c.TipoDeuda, c.UsuarioId, c.Activo, c.Orden);
+        new(c.Id, c.Nombre, c.Tipo, c.Presupuesto, c.Emoji, c.FechaVencimiento, c.CuotasRestantes, c.MontoTotal, c.CapitalPorCuota, c.TipoDeuda, c.UsuarioId, c.Activo, c.Orden, c.Cobertura, c.VigenciaDesde, c.VigenciaHasta, c.EstadoDeuda);
 
     public static PeriodoDto ToDto(this Periodo p) =>
         new(p.Id, p.Anio, p.Mes, p.FechaInicio, p.FechaFin, p.Moneda, p.BalanceInicial, p.Estado);

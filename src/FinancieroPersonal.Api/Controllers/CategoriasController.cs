@@ -31,6 +31,14 @@ public class CategoriasController(CategoriaService service) : ControllerBase
     public async Task<ActionResult<CategoriaDto>> SetActivo(Guid id, SetActivoRequest req, CancellationToken ct)
         => Ok(await service.SetActivoAsync(id, req.Activo, ct));
 
+    [HttpPatch("{id:guid}/estado-deuda")]
+    public async Task<ActionResult<CategoriaDto>> SetEstadoDeuda(Guid id, SetEstadoDeudaRequest req, CancellationToken ct)
+        => Ok(await service.SetEstadoDeudaAsync(id, req.EstadoDeuda, ct));
+
+    [HttpPatch("{id:guid}/cobertura")]
+    public async Task<ActionResult<CategoriaDto>> SetCobertura(Guid id, SetCoberturaRequest req, CancellationToken ct)
+        => Ok(await service.SetCoberturaAsync(id, req.Cobertura, ct));
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {

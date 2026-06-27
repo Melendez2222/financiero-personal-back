@@ -39,7 +39,7 @@ public class DeudaService(IAppDbContext db)
             return new DeudaDto(
                 c.Id, c.Nombre, c.Emoji, c.FechaVencimiento, c.Presupuesto, c.CuotasRestantes,
                 c.MontoTotal, c.CapitalPorCuota, c.TipoDeuda, capitalPagado, interesPagado, stats.Cuotas,
-                saldo, pct, c.Activo);
+                saldo, pct, c.Activo, c.EstadoDeuda);
         }).ToList();
     }
 }
