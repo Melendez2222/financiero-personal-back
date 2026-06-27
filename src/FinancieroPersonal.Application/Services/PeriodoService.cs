@@ -223,11 +223,29 @@ public class PeriodoService(IAppDbContext db)
         var tengoAhora = flujo.BalanceInicial + flujo.IngresosActual
             - (flujo.FijosActual + flujo.NecesariosActual + flujo.DeudasActual + flujo.AhorrosActual + flujo.SituacionalesActual);
         var porRecibir = Pendiente(flujo.IngresosPresupuesto, flujo.IngresosActual);
+        // Reserva el presupuesto que falta por cubrir de TODOS los grupos activos (incl. necesarios).
         var porPagar = Pendiente(flujo.FijosPresupuesto, flujo.FijosActual)
+            + Pendiente(flujo.NecesariosPresupuesto, flujo.NecesariosActual)
             + Pendiente(flujo.DeudasPresupuesto, flujo.DeudasActual)
             + Pendiente(flujo.AhorrosPresupuesto, flujo.AhorrosActual);
-        var disponible = Calc.Round2(tengoAhora + porRecibir - porPagar);
 
-        return new ResumenPeriodoDto(periodo.ToDto(), secciones, situacionales, flujo, disponible);
+        // Metas de ahorro activas: reservar el aporte mensual que aún no se ha cubierto ESTE mes
+        // (aportes con fecha dentro del periodo). Solo en vista global (las metas son del hogar).
+        decimal metasPorAportar = 0m;
+        if (usuarioId == null)
+        {
+            var aportesMes = (await db.Aportes
+                    .Where(a => a.Fecha >= periodo.FechaInicio && a.Fecha <= periodo.FechaFin)
+                    .ToListAsync(ct))
+                .GroupBy(a => a.MetaId)
+                .ToDictionary(g => g.Key, g => g.Sum(a => a.Monto));
+            var metasActivas = await db.Metas.Where(m => m.Activo).ToListAsync(ct);
+            metasPorAportar = Calc.Round2(
+                metasActivas.Sum(m => Math.Max(0m, m.AporteMensual - aportesMes.GetValueOrDefault(m.Id))));
+        }
+
+        var disponible = Calc.Round2(tengoAhora + porRecibir - porPagar - metasPorAportar);
+
+        return new ResumenPeriodoDto(periodo.ToDto(), secciones, situacionales, flujo, disponible, metasPorAportar);
     }
 }

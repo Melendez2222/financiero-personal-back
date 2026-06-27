@@ -41,4 +41,5 @@ public record ResumenPeriodoDto(
     IReadOnlyList<SeccionResumenDto> Secciones,
     IReadOnlyList<SituacionalDto> Situacionales,
     FlujoResumenDto Flujo,
-    decimal Disponible);
+    decimal Disponible,
+    decimal MetasPorAportar);
