@@ -62,7 +62,7 @@ public class ProyeccionService(IAppDbContext db, PeriodoService periodos)
         int desdeMes;
         if (ultimo is not null)
         {
-            var f = (await periodos.ResumenAsync(ultimo.Id, ct)).Flujo;
+            var f = (await periodos.ResumenAsync(ultimo.Id, null, ct)).Flujo;
             saldo = Calc.Round2(
                 f.BalanceInicial + f.IngresosActual - f.FijosActual - f.NecesariosActual
                 - f.DeudasActual - f.AhorrosActual - f.SituacionalesActual);

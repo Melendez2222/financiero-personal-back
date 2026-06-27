@@ -82,11 +82,11 @@ public class PeriodoService(IAppDbContext db)
         return p.ToDto();
     }
 
-    public async Task<ResumenPeriodoDto> ResumenAsync(Guid id, CancellationToken ct)
+    public async Task<ResumenPeriodoDto> ResumenAsync(Guid id, Guid? usuarioId, CancellationToken ct)
     {
         var p = await db.Periodos.FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw AppException.NotFound("Periodo no encontrado.");
-        return await ConstruirResumenAsync(p, ct);
+        return await ConstruirResumenAsync(p, usuarioId, ct);
     }
 
     public async Task EliminarAsync(Guid id, CancellationToken ct)
@@ -126,18 +126,27 @@ public class PeriodoService(IAppDbContext db)
 
     private async Task<decimal> BalanceFinalAsync(Periodo periodo, CancellationToken ct)
     {
-        var r = await ConstruirResumenAsync(periodo, ct);
+        // La herencia de balance es del hogar (global), nunca por persona.
+        var r = await ConstruirResumenAsync(periodo, null, ct);
         var f = r.Flujo;
         return f.BalanceInicial + f.IngresosActual - f.FijosActual - f.NecesariosActual
                - f.DeudasActual - f.AhorrosActual - f.SituacionalesActual;
     }
 
-    private async Task<ResumenPeriodoDto> ConstruirResumenAsync(Periodo periodo, CancellationToken ct)
+    /// <summary>
+    /// Construye el resumen del periodo. Si <paramref name="usuarioId"/> no es null, filtra a esa
+    /// persona: solo movimientos atribuidos a ella (actual) y solo categorías cuya persona por
+    /// defecto es ella (presupuesto). Null = vista global del hogar.
+    /// </summary>
+    private async Task<ResumenPeriodoDto> ConstruirResumenAsync(Periodo periodo, Guid? usuarioId, CancellationToken ct)
     {
         var categorias = await db.Categorias.ToListAsync(ct);
         var catById = categorias.ToDictionary(c => c.Id);
         var snapshot = await db.PeriodoCategorias.Where(pc => pc.PeriodoId == periodo.Id).ToListAsync(ct);
-        var movs = await db.Movimientos.Where(m => m.PeriodoId == periodo.Id).ToListAsync(ct);
+        var movs = await db.Movimientos
+            .Where(m => m.PeriodoId == periodo.Id)
+            .Where(m => usuarioId == null || m.UsuarioId == usuarioId)
+            .ToListAsync(ct);
 
         // Unión del snapshot + categorías activas que se crearon DESPUÉS de tomarlo.
         // El snapshot conserva los montos/membresía congelados del mes (desactivar no borra la
@@ -152,6 +161,10 @@ public class PeriodoService(IAppDbContext db)
                           .Select(c => (c, c.Presupuesto)))
                       .ToList()
             : categorias.Where(c => c.Activo).Select(c => (c, c.Presupuesto)).ToList();
+
+        // Vista por persona: el presupuesto también se acota a las categorías de esa persona.
+        if (usuarioId != null)
+            baseLineas = baseLineas.Where(b => b.cat.UsuarioId == usuarioId).ToList();
 
         var actualByCat = movs
             .Where(m => m.CategoriaId != null)
@@ -201,17 +214,19 @@ public class PeriodoService(IAppDbContext db)
             situacionalesActual,
             Calc.Round2(gastoPres - gastoActual - situacionalesActual));
 
-        // "Dinero disponible" realista: lo que tienes ahora (balance + ingresos recibidos − TODO lo
-        // ya pagado) menos lo que AÚN debes pagar de fijos, deudas y ahorros (pendiente = presupuesto
-        // − pagado, si es > 0). Los necesarios ya gastados cuentan como pagado; los pendientes no se
-        // reservan (son el gasto discrecional que este disponible representa).
+        // "Dinero disponible" realista (proyección de fin de mes): lo que tienes ahora (balance +
+        // ingresos recibidos − TODO lo ya pagado), MÁS los ingresos que aún esperas recibir, MENOS lo
+        // que aún debes pagar de fijos/deudas/ahorros (pendiente = presupuesto − actual, si > 0). Así
+        // es simétrico: cuenta tanto lo que falta cobrar como lo que falta pagar. Los necesarios ya
+        // gastados cuentan como pagado; los pendientes no se reservan (son el gasto discrecional).
         decimal Pendiente(decimal pres, decimal act) => Math.Max(0, pres - act);
         var tengoAhora = flujo.BalanceInicial + flujo.IngresosActual
             - (flujo.FijosActual + flujo.NecesariosActual + flujo.DeudasActual + flujo.AhorrosActual + flujo.SituacionalesActual);
+        var porRecibir = Pendiente(flujo.IngresosPresupuesto, flujo.IngresosActual);
         var porPagar = Pendiente(flujo.FijosPresupuesto, flujo.FijosActual)
             + Pendiente(flujo.DeudasPresupuesto, flujo.DeudasActual)
             + Pendiente(flujo.AhorrosPresupuesto, flujo.AhorrosActual);
-        var disponible = Calc.Round2(tengoAhora - porPagar);
+        var disponible = Calc.Round2(tengoAhora + porRecibir - porPagar);
 
         return new ResumenPeriodoDto(periodo.ToDto(), secciones, situacionales, flujo, disponible);
     }

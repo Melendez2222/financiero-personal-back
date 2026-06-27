@@ -9,7 +9,7 @@ namespace FinancieroPersonal.Application.Services;
 
 public class DashboardService(IAppDbContext db, PeriodoService periodos)
 {
-    public async Task<DashboardDto> GetAsync(Guid? periodoId, CancellationToken ct)
+    public async Task<DashboardDto> GetAsync(Guid? periodoId, Guid? usuarioId, CancellationToken ct)
     {
         var todos = await db.Periodos.ToListAsync(ct);
         if (todos.Count == 0) throw AppException.NotFound("Sin datos de dashboard.");
@@ -23,7 +23,10 @@ public class DashboardService(IAppDbContext db, PeriodoService periodos)
         var idx = ordenados.FindIndex(p => p.Id == periodo.Id);
         var previo = idx > 0 ? ordenados[idx - 1] : null;
 
-        var movs = await db.Movimientos.ToListAsync(ct);
+        // Vista por persona: solo los movimientos atribuidos a ella (null = global del hogar).
+        var movs = await db.Movimientos
+            .Where(m => usuarioId == null || m.UsuarioId == usuarioId)
+            .ToListAsync(ct);
         var categorias = await db.Categorias.ToListAsync(ct);
         var metas = await db.Metas.ToListAsync(ct);
 
@@ -72,7 +75,7 @@ public class DashboardService(IAppDbContext db, PeriodoService periodos)
             .OrderByDescending(d => d.Monto)
             .ToList();
 
-        var resumen = await periodos.ResumenAsync(periodo.Id, ct);
+        var resumen = await periodos.ResumenAsync(periodo.Id, usuarioId, ct);
 
         var metasDto = metas.Select(m => new MetaProgresoDto(
             m.Id, m.Nombre,

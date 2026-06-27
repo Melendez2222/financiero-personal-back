@@ -11,6 +11,6 @@ namespace FinancieroPersonal.Api.Controllers;
 public class DashboardController(DashboardService service) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<DashboardDto>> Get([FromQuery] Guid? periodoId, CancellationToken ct)
-        => Ok(await service.GetAsync(periodoId, ct));
+    public async Task<ActionResult<DashboardDto>> Get([FromQuery] Guid? periodoId, [FromQuery] Guid? usuarioId, CancellationToken ct)
+        => Ok(await service.GetAsync(periodoId, usuarioId, ct));
 }
