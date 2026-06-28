@@ -26,6 +26,13 @@ public class MetasController(MetaService service) : ControllerBase
     public async Task<ActionResult<MetaDto>> SetActivo(Guid id, SetActivoRequest req, CancellationToken ct)
         => Ok(await service.SetActivoAsync(id, req.Activo, ct));
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        await service.EliminarAsync(id, ct);
+        return NoContent();
+    }
+
     [HttpPost("{id:guid}/aportes")]
     public async Task<ActionResult<MetaDto>> Aportar(Guid id, AporteMetaRequest req, CancellationToken ct)
         => StatusCode(201, await service.AportarAsync(id, req, ct));

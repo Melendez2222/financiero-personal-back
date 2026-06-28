@@ -30,16 +30,24 @@ public class DashboardService(IAppDbContext db, PeriodoService periodos)
         var categorias = await db.Categorias.ToListAsync(ct);
         var metas = await db.Metas.ToListAsync(ct);
 
+        // Para DEUDAS, la "recuperación" es solo el capital (MontoCapital ?? Monto); el interés no
+        // cuenta como pago de la deuda. Para el resto de tipos es el monto completo.
+        decimal MontoOCapital(Movimiento m) => m.Tipo == Tipo.Deuda ? (m.MontoCapital ?? m.Monto) : m.Monto;
+
+        // Pago completo (efectivo) — para el gráfico de flujo de meses (entradas vs salidas).
         decimal TotalTipo(Guid pid, Tipo t) =>
             Calc.Round2(movs.Where(m => m.PeriodoId == pid && m.Tipo == t).Sum(m => m.Monto));
+        // Recuperación (capital en deudas, monto completo en el resto) — para KPIs y desglose.
+        decimal TotalRecuperacion(Guid pid, Tipo t) =>
+            Calc.Round2(movs.Where(m => m.PeriodoId == pid && m.Tipo == t).Sum(MontoOCapital));
 
         decimal Delta(decimal actual, decimal anterior) =>
             anterior == 0 ? (actual == 0 ? 0 : 100) : Calc.Round2((actual - anterior) / anterior * 100);
 
         KpiValorDto Kpi(Tipo t)
         {
-            var actual = TotalTipo(periodo.Id, t);
-            var anterior = previo is null ? 0 : TotalTipo(previo.Id, t);
+            var actual = TotalRecuperacion(periodo.Id, t);
+            var anterior = previo is null ? 0 : TotalRecuperacion(previo.Id, t);
             return new KpiValorDto(actual, Delta(actual, anterior));
         }
 
@@ -50,7 +58,7 @@ public class DashboardService(IAppDbContext db, PeriodoService periodos)
 
         var actualByCat = movs.Where(m => m.PeriodoId == periodo.Id && m.CategoriaId != null)
             .GroupBy(m => m.CategoriaId!.Value)
-            .ToDictionary(g => g.Key, g => g.Sum(m => m.Monto));
+            .ToDictionary(g => g.Key, g => g.Sum(MontoOCapital));
 
         var gastosCat = categorias
             .Where(c => Calc.EsGasto(c.Tipo) && actualByCat.GetValueOrDefault(c.Id) > 0)
@@ -79,7 +87,7 @@ public class DashboardService(IAppDbContext db, PeriodoService periodos)
 
         var metasDto = metas.Select(m => new MetaProgresoDto(
             m.Id, m.Nombre,
-            m.MontoObjetivo > 0 ? Math.Min(100, Calc.Round2(m.MontoAcumulado / m.MontoObjetivo * 100)) : 0,
+            m.MontoObjetivo is { } o && o > 0 ? Math.Min(100, Calc.Round2(m.MontoAcumulado / o * 100)) : 0,
             m.MontoAcumulado, m.MontoObjetivo)).ToList();
 
         var kpis = new KpisDto(

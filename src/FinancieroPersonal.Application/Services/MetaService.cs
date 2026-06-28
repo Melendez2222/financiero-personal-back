@@ -43,11 +43,13 @@ public class MetaService(IAppDbContext db)
 
         if (req.Nombre is not null) meta.Nombre = req.Nombre;
         if (req.Emoji is not null) meta.Emoji = req.Emoji;
-        if (req.MontoObjetivo is not null) meta.MontoObjetivo = req.MontoObjetivo.Value;
         if (req.AporteMensual is not null) meta.AporteMensual = req.AporteMensual.Value;
-        if (req.FechaLimite is not null) meta.FechaLimite = req.FechaLimite;
         if (req.Estado is not null) meta.Estado = req.Estado.Value;
         if (req.Activo is not null) meta.Activo = req.Activo.Value;
+        // Asignación directa: el diálogo manda el objeto completo, así se puede limpiar el objetivo
+        // (ahorro abierto) y la fecha límite.
+        meta.MontoObjetivo = req.MontoObjetivo;
+        meta.FechaLimite = req.FechaLimite;
 
         await db.SaveChangesAsync(ct);
         return meta.ToDto();
@@ -73,7 +75,8 @@ public class MetaService(IAppDbContext db)
 
         meta.MontoAcumulado += req.Monto;
         meta.AporteMes += req.Monto;
-        if (meta.MontoAcumulado >= meta.MontoObjetivo)
+        // Solo las metas con objetivo se autofinalizan al alcanzarlo; las abiertas nunca.
+        if (meta.MontoObjetivo is { } obj && meta.MontoAcumulado >= obj)
             meta.Estado = EstadoMeta.Finalizado;
 
         db.Aportes.Add(new AporteMeta
@@ -86,6 +89,18 @@ public class MetaService(IAppDbContext db)
 
         await db.SaveChangesAsync(ct);
         return meta.ToDto();
+    }
+
+    public async Task EliminarAsync(Guid id, CancellationToken ct)
+    {
+        var meta = await db.Metas.FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw AppException.NotFound("Meta no encontrada.");
+
+        // Borrado lógico: el filtro global la oculta de todas las consultas; los aportes
+        // (AporteMeta) se conservan en BD para auditoría.
+        meta.Eliminado = true;
+        meta.EliminadoEn = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task<List<AporteDto>> ListAportesAsync(Guid metaId, CancellationToken ct)

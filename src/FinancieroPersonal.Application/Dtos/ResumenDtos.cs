@@ -35,7 +35,9 @@ public record FlujoResumenDto(
     decimal AhorrosPresupuesto,
     decimal AhorrosActual,
     decimal SituacionalesActual,
-    decimal TotalRestante);
+    decimal TotalRestante,
+    /// <summary>Interés pagado en deudas Iniciadas este mes (pago completo − capital recuperado).</summary>
+    decimal InteresesActual);
 
 public record ResumenPeriodoDto(
     PeriodoDto Periodo,

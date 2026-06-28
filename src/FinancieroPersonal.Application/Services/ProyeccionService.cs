@@ -47,7 +47,9 @@ public class ProyeccionService(IAppDbContext db, PeriodoService periodos)
         var deudaTerminada = deudas.ToDictionary(d => d.Id, _ => false);
 
         var metas = (await db.Metas.ToListAsync(ct))
-            .Where(m => m.Activo && m.AporteMensual > 0 && m.MontoAcumulado < m.MontoObjetivo)
+            // Metas con objetivo aún no cumplido, o abiertas (sin objetivo) que aportan cada mes.
+            .Where(m => m.Activo && m.AporteMensual > 0
+                && (m.MontoObjetivo == null || m.MontoAcumulado < m.MontoObjetivo))
             .Select(m => new { m.Id, m.Nombre, m.AporteMensual, m.MontoObjetivo, Acumulado = m.MontoAcumulado })
             .ToList();
         var acumuladoMeta = metas.ToDictionary(m => m.Id, m => m.Acumulado);
@@ -115,7 +117,8 @@ public class ProyeccionService(IAppDbContext db, PeriodoService periodos)
                 if (metaCompleta[m.Id]) continue;
                 ahorroMes += m.AporteMensual;
                 acumuladoMeta[m.Id] += m.AporteMensual;
-                if (acumuladoMeta[m.Id] >= m.MontoObjetivo)
+                // Las abiertas (sin objetivo) nunca se completan: siguen aportando cada mes.
+                if (m.MontoObjetivo is { } obj && acumuladoMeta[m.Id] >= obj)
                 {
                     metaCompleta[m.Id] = true;
                     hitos.Add($"Completas la meta {m.Nombre}");

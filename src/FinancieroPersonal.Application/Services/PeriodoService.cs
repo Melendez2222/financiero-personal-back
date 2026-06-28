@@ -178,27 +178,34 @@ public class PeriodoService(IAppDbContext db)
         if (usuarioId != null)
             baseLineas = baseLineas.Where(b => b.cat.UsuarioId == usuarioId).ToList();
 
-        var actualByCat = movs
+        var movsByCat = movs
             .Where(m => m.CategoriaId != null)
             .GroupBy(m => m.CategoriaId!.Value)
-            .ToDictionary(g => g.Key, g => g.Sum(m => m.Monto));
-        decimal Actual(Guid catId) => actualByCat.TryGetValue(catId, out var v) ? v : 0m;
+            .ToDictionary(g => g.Key, g => g.ToList());
+        // Pago completo (capital + interés) — lo que salió del bolsillo.
+        decimal ActualMonto(Guid catId) => movsByCat.TryGetValue(catId, out var l) ? l.Sum(m => m.Monto) : 0m;
+        // Solo capital recuperado (MontoCapital ?? Monto) — lo que realmente baja la deuda.
+        decimal ActualCapital(Guid catId) => movsByCat.TryGetValue(catId, out var l) ? l.Sum(m => m.MontoCapital ?? m.Monto) : 0m;
 
         var secciones = new List<SeccionResumenDto>();
         foreach (var tipo in Enum.GetValues<Tipo>())
         {
             if (tipo == Tipo.Situacional) continue; // se maneja aparte (sin catálogo)
+            var esDeuda = tipo == Tipo.Deuda;
             // Deudas: solo cuentan en el mes las que están activadas e iniciadas (EstadoDeuda.Iniciada).
             // Las Pendiente/Suspendida/Saldada no inflan el presupuesto ni el actual del periodo.
             var lineas = baseLineas
                 .Where(b => b.cat.Tipo == tipo
-                    && (tipo != Tipo.Deuda || b.cat.EstadoDeuda == EstadoDeuda.Iniciada))
+                    && (!esDeuda || b.cat.EstadoDeuda == EstadoDeuda.Iniciada))
                 .OrderBy(b => b.cat.Orden)
                 .Select(b =>
                 {
-                    var actual = Calc.Round2(Actual(b.cat.Id));
-                    return new LineaResumenDto(b.cat.Id, b.cat.Nombre, tipo, b.pres, actual,
-                        Calc.Round2(b.pres - actual), b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo);
+                    // Deuda = recuperación de CAPITAL (no la cuota completa); presupuesto = capital de la
+                    // cuota (CapitalPorCuota; sin interés es null → la cuota completa, que ya es capital).
+                    var actual = Calc.Round2(esDeuda ? ActualCapital(b.cat.Id) : ActualMonto(b.cat.Id));
+                    var pres = esDeuda ? (b.cat.CapitalPorCuota ?? b.pres) : b.pres;
+                    return new LineaResumenDto(b.cat.Id, b.cat.Nombre, tipo, pres, actual,
+                        Calc.Round2(pres - actual), b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo);
                 })
                 .ToList();
 
@@ -207,6 +214,13 @@ public class PeriodoService(IAppDbContext db)
                 Calc.Round2(lineas.Sum(l => l.MontoPresupuestado)),
                 Calc.Round2(lineas.Sum(l => l.Actual))));
         }
+
+        // Interés pagado este mes en deudas Iniciadas (pago completo − capital). Sale del bolsillo
+        // (resta del saldo) pero se contabiliza aparte de la recuperación de capital.
+        var interesesActual = Calc.Round2(
+            baseLineas
+                .Where(b => b.cat.Tipo == Tipo.Deuda && b.cat.EstadoDeuda == EstadoDeuda.Iniciada)
+                .Sum(b => ActualMonto(b.cat.Id) - ActualCapital(b.cat.Id)));
 
         var situacionales = movs
             .Where(m => m.Tipo == Tipo.Situacional)
@@ -227,14 +241,18 @@ public class PeriodoService(IAppDbContext db)
             Sec(Tipo.Deuda).TotalPresupuestado, Sec(Tipo.Deuda).TotalActual,
             Sec(Tipo.Ahorro).TotalPresupuestado, Sec(Tipo.Ahorro).TotalActual,
             situacionalesActual,
-            Calc.Round2(gastoPres - gastoActual - situacionalesActual));
+            Calc.Round2(gastoPres - gastoActual - situacionalesActual),
+            interesesActual);
 
         // "Saldo disponible" = SALDO ACTUAL real: lo que tienes ahora = balance inicial + ingresos ya
         // recibidos − TODO lo ya pagado (fijos/necesarios/deudas/ahorros/situacionales actuales). NO
         // reserva compromisos pendientes; la proyección de fin de mes la calcula el frontend a partir
         // del flujo + metasPorAportar.
+        // DeudasActual ahora es solo capital; el interés pagado también salió del bolsillo, así que se
+        // resta aparte → el saldo queda idéntico a sumar la cuota completa.
         var tengoAhora = flujo.BalanceInicial + flujo.IngresosActual
-            - (flujo.FijosActual + flujo.NecesariosActual + flujo.DeudasActual + flujo.AhorrosActual + flujo.SituacionalesActual);
+            - (flujo.FijosActual + flujo.NecesariosActual + flujo.DeudasActual + flujo.AhorrosActual
+               + flujo.SituacionalesActual + flujo.InteresesActual);
 
         // Metas de ahorro activas: aporte mensual que aún no se ha cubierto ESTE mes (lo usa el front
         // para la proyección secundaria). Solo en vista global (las metas son del hogar).

@@ -15,7 +15,7 @@ public record FlujoMesDto(string Mes, decimal Ingresos, decimal Gastos);
 
 public record DesgloseDto(string Categoria, Tipo Tipo, decimal Monto, decimal Pct);
 
-public record MetaProgresoDto(Guid Id, string Nombre, decimal Pct, decimal Actual, decimal Objetivo);
+public record MetaProgresoDto(Guid Id, string Nombre, decimal Pct, decimal Actual, decimal? Objetivo);
 
 public record DashboardDto(
     KpisDto Kpis,

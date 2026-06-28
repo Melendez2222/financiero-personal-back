@@ -81,6 +81,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.AporteMensual).HasPrecision(18, 2);
             e.Property(x => x.MontoAcumulado).HasPrecision(18, 2);
             e.Property(x => x.AporteMes).HasPrecision(18, 2);
+            e.HasQueryFilter(x => !x.Eliminado);
         });
 
         b.Entity<AporteMeta>(e =>

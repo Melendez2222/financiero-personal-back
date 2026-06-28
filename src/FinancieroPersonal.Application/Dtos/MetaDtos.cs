@@ -6,7 +6,7 @@ public record MetaDto(
     Guid Id,
     string Nombre,
     string Emoji,
-    decimal MontoObjetivo,
+    decimal? MontoObjetivo,
     decimal AporteMensual,
     decimal MontoAcumulado,
     decimal AporteMes,
@@ -17,7 +17,7 @@ public record MetaDto(
 public record CrearMetaRequest(
     string Nombre,
     string Emoji,
-    decimal MontoObjetivo,
+    decimal? MontoObjetivo,
     decimal AporteMensual,
     DateOnly? FechaLimite,
     EstadoMeta? Estado);
