@@ -37,6 +37,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(x => x.Presupuesto).HasPrecision(18, 2);
             e.Property(x => x.MontoTotal).HasPrecision(18, 2);
             e.Property(x => x.CapitalPorCuota).HasPrecision(18, 2);
+            e.Property(x => x.MontoQuincena).HasPrecision(18, 2);
+            e.Property(x => x.MontoFinDeMes).HasPrecision(18, 2);
             e.Property(x => x.Emoji).HasMaxLength(16);
             e.Property(x => x.FechaVencimiento).HasMaxLength(8);
             e.HasQueryFilter(x => !x.Eliminado);
@@ -61,6 +63,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<Movimiento>(e =>
         {
             e.Property(x => x.Tipo).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Cobertura).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.Monto).HasPrecision(18, 2);
             e.Property(x => x.MontoCapital).HasPrecision(18, 2);
             e.Property(x => x.EsCuota).HasDefaultValue(true);
@@ -69,6 +72,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.HasIndex(x => x.PeriodoId);
             e.HasIndex(x => x.CategoriaId);
             e.HasIndex(x => x.UsuarioId);
+            e.HasIndex(x => x.MetaId);
             e.HasQueryFilter(x => !x.Eliminado);
         });
 

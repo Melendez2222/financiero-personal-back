@@ -17,6 +17,8 @@ public record CategoriaDto(
     bool Activo,
     int Orden,
     CoberturaIngreso? Cobertura,
+    decimal? MontoQuincena,
+    decimal? MontoFinDeMes,
     DateOnly? VigenciaDesde,
     DateOnly? VigenciaHasta,
     EstadoDeuda EstadoDeuda);
@@ -34,6 +36,8 @@ public record CrearCategoriaRequest(
     Guid? UsuarioId,
     bool? Activo,
     CoberturaIngreso? Cobertura,
+    decimal? MontoQuincena,
+    decimal? MontoFinDeMes,
     DateOnly? VigenciaDesde,
     DateOnly? VigenciaHasta,
     EstadoDeuda? EstadoDeuda);
@@ -50,6 +54,8 @@ public record ActualizarCategoriaRequest(
     Guid? UsuarioId,
     bool? Activo,
     CoberturaIngreso? Cobertura,
+    decimal? MontoQuincena,
+    decimal? MontoFinDeMes,
     DateOnly? VigenciaDesde,
     DateOnly? VigenciaHasta,
     EstadoDeuda? EstadoDeuda);

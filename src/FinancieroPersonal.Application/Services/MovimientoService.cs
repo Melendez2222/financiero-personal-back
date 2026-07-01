@@ -44,10 +44,37 @@ public class MovimientoService(IAppDbContext db)
         return m.ToDto();
     }
 
+    private async Task<MetaAhorro> ValidarYCargarAhorroAsync(Guid metaId, decimal monto, CancellationToken ct)
+    {
+        var meta = await db.Metas.FirstOrDefaultAsync(x => x.Id == metaId, ct)
+            ?? throw AppException.BadRequest("ahorro_invalido", "Ahorro no encontrado.");
+        if (meta.MontoObjetivo is not null)
+            throw AppException.BadRequest("ahorro_invalido", "Solo se puede pagar desde un ahorro (sin meta fija).");
+        if (meta.MontoAcumulado < monto)
+            throw AppException.BadRequest("saldo_insuficiente",
+                $"Saldo insuficiente en el ahorro (disponible: {meta.MontoAcumulado:N2}).");
+        return meta;
+    }
+
+    private async Task RevertirCargoAhorroAsync(Guid? metaId, decimal monto, CancellationToken ct)
+    {
+        if (metaId is null) return;
+        var meta = await db.Metas.FirstOrDefaultAsync(x => x.Id == metaId, ct);
+        if (meta is not null) meta.MontoAcumulado += monto;
+    }
+
     public async Task<MovimientoDto> CrearAsync(CrearMovimientoRequest req, CancellationToken ct)
     {
+        if (req.MetaId is not null && req.Tipo == Tipo.Ingreso)
+            throw AppException.BadRequest("ahorro_invalido", "Los ingresos no pueden pagarse desde un ahorro.");
+
         var sinCategoria = req.Tipo == Tipo.Situacional
             || (req.Tipo == Tipo.Ingreso && req.CategoriaId is null);
+
+        MetaAhorro? meta = null;
+        if (req.MetaId is not null)
+            meta = await ValidarYCargarAhorroAsync(req.MetaId.Value, req.Monto, ct);
+
         var movimiento = new Movimiento
         {
             PeriodoId = req.PeriodoId,
@@ -57,11 +84,16 @@ public class MovimientoService(IAppDbContext db)
             UsuarioId = req.UsuarioId,
             Fecha = req.Fecha,
             Monto = req.Monto,
-            // Solo las deudas guardan el desglose capital/interés; el resto, null.
             MontoCapital = req.Tipo == Tipo.Deuda ? req.MontoCapital : null,
             EsCuota = req.EsCuota ?? true,
             Nota = req.Nota ?? string.Empty,
+            Cobertura = req.Cobertura,
+            MetaId = req.MetaId,
         };
+
+        if (meta is not null)
+            meta.MontoAcumulado -= req.Monto;
+
         db.Movimientos.Add(movimiento);
         await db.SaveChangesAsync(ct);
         return movimiento.ToDto();
@@ -72,14 +104,22 @@ public class MovimientoService(IAppDbContext db)
         var m = await db.Movimientos.FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw AppException.NotFound("Movimiento no encontrado.");
 
+        var metaIdAnterior = m.MetaId;
+        var montoAnterior = m.Monto;
+
+        await RevertirCargoAhorroAsync(metaIdAnterior, montoAnterior, ct);
+
         if (req.Tipo is not null) m.Tipo = req.Tipo.Value;
         if (req.Fecha is not null) m.Fecha = req.Fecha.Value;
         if (req.Monto is not null) m.Monto = req.Monto.Value;
         if (req.Nota is not null) m.Nota = req.Nota;
         m.UsuarioId = req.UsuarioId;
-        // Solo deudas conservan el desglose capital/interés. Si el request NO trae MontoCapital
-        // (p.ej. edición desde el historial genérico de Gastos), se PRESERVA el existente: un null
-        // haría que el monto completo cuente como capital e inflaría el "capital recuperado".
+        m.Cobertura = req.Cobertura;
+        m.MetaId = req.MetaId;
+
+        if (m.Tipo == Tipo.Ingreso && m.MetaId is not null)
+            throw AppException.BadRequest("ahorro_invalido", "Los ingresos no pueden pagarse desde un ahorro.");
+
         if (m.Tipo == Tipo.Deuda) { if (req.MontoCapital is not null) m.MontoCapital = req.MontoCapital; }
         else { m.MontoCapital = null; }
         if (req.EsCuota is not null) m.EsCuota = req.EsCuota.Value;
@@ -96,8 +136,13 @@ public class MovimientoService(IAppDbContext db)
         }
         else if (m.Tipo == Tipo.Ingreso && m.CategoriaId is null)
         {
-            // Ingreso extra: sin categoría; solo actualiza concepto si viene en el request.
             if (req.Concepto is not null) m.Concepto = req.Concepto;
+        }
+
+        if (m.MetaId is not null)
+        {
+            var meta = await ValidarYCargarAhorroAsync(m.MetaId.Value, m.Monto, ct);
+            meta.MontoAcumulado -= m.Monto;
         }
 
         await db.SaveChangesAsync(ct);
@@ -108,6 +153,9 @@ public class MovimientoService(IAppDbContext db)
     {
         var m = await db.Movimientos.FirstOrDefaultAsync(x => x.Id == id, ct);
         if (m is null) return;
+
+        await RevertirCargoAhorroAsync(m.MetaId, m.Monto, ct);
+
         m.Eliminado = true;
         m.EliminadoEn = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);

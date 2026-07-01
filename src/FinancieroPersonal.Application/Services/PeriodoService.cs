@@ -156,6 +156,8 @@ public class PeriodoService(IAppDbContext db)
             .Where(m => m.PeriodoId == periodo.Id)
             .Where(m => usuarioId == null || m.UsuarioId == usuarioId)
             .ToListAsync(ct);
+        // Gastos financiados desde ahorro no afectan el flujo del mes (disponible / actuales).
+        var movsFlujo = movs.Where(m => m.MetaId == null).ToList();
 
         // Unión del snapshot + categorías activas que se crearon DESPUÉS de tomarlo.
         // El snapshot conserva los montos/membresía congelados del mes (desactivar no borra la
@@ -178,47 +180,65 @@ public class PeriodoService(IAppDbContext db)
         if (usuarioId != null)
             baseLineas = baseLineas.Where(b => b.cat.UsuarioId == usuarioId).ToList();
 
-        var movsByCat = movs
+        var movsByCat = movsFlujo
             .Where(m => m.CategoriaId != null)
             .GroupBy(m => m.CategoriaId!.Value)
             .ToDictionary(g => g.Key, g => g.ToList());
         // Pago completo (capital + interés) — lo que salió del bolsillo.
         decimal ActualMonto(Guid catId) => movsByCat.TryGetValue(catId, out var l) ? l.Sum(m => m.Monto) : 0m;
+        decimal ActualMontoCobertura(Guid catId, CoberturaIngreso? cobertura) =>
+            movsByCat.TryGetValue(catId, out var l)
+                ? l.Where(m => m.Cobertura == cobertura).Sum(m => m.Monto)
+                : 0m;
         // Solo capital recuperado (MontoCapital ?? Monto) — lo que realmente baja la deuda.
         decimal ActualCapital(Guid catId) => movsByCat.TryGetValue(catId, out var l) ? l.Sum(m => m.MontoCapital ?? m.Monto) : 0m;
+
+        static bool CatDividida(Categoria c) => c.MontoQuincena is not null && c.MontoFinDeMes is not null;
 
         var secciones = new List<SeccionResumenDto>();
         foreach (var tipo in Enum.GetValues<Tipo>())
         {
             if (tipo == Tipo.Situacional) continue; // se maneja aparte (sin catálogo)
             var esDeuda = tipo == Tipo.Deuda;
-            // Deudas: solo cuentan en el mes las que están activadas e iniciadas (EstadoDeuda.Iniciada).
-            // Las Pendiente/Suspendida/Saldada no inflan el presupuesto ni el actual del periodo.
-            var lineas = baseLineas
-                .Where(b => b.cat.Tipo == tipo
-                    && (!esDeuda || b.cat.EstadoDeuda == EstadoDeuda.Iniciada))
-                .OrderBy(b => b.cat.Orden)
-                .Select(b =>
+            var lineas = new List<LineaResumenDto>();
+            foreach (var b in baseLineas
+                         .Where(b => b.cat.Tipo == tipo
+                             && (!esDeuda || b.cat.EstadoDeuda == EstadoDeuda.Iniciada))
+                         .OrderBy(b => b.cat.Orden))
+            {
+                if (!esDeuda && CatDividida(b.cat))
                 {
-                    // Deuda = recuperación de CAPITAL (no la cuota completa); presupuesto = capital de la
-                    // cuota (CapitalPorCuota; sin interés es null → la cuota completa, que ya es capital).
+                    var mq = b.cat.MontoQuincena!.Value;
+                    var mf = b.cat.MontoFinDeMes!.Value;
+                    var actualQ = Calc.Round2(ActualMontoCobertura(b.cat.Id, CoberturaIngreso.Quincena));
+                    var actualF = Calc.Round2(ActualMontoCobertura(b.cat.Id, CoberturaIngreso.FinDeMes));
+                    lineas.Add(new LineaResumenDto(
+                        b.cat.Id, b.cat.Nombre, tipo, mq, actualQ, Calc.Round2(mq - actualQ),
+                        b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo, CoberturaIngreso.Quincena));
+                    lineas.Add(new LineaResumenDto(
+                        b.cat.Id, b.cat.Nombre, tipo, mf, actualF, Calc.Round2(mf - actualF),
+                        b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo, CoberturaIngreso.FinDeMes));
+                }
+                else
+                {
                     var actual = Calc.Round2(esDeuda ? ActualCapital(b.cat.Id) : ActualMonto(b.cat.Id));
                     var pres = esDeuda ? (b.cat.CapitalPorCuota ?? b.pres) : b.pres;
-                    return new LineaResumenDto(b.cat.Id, b.cat.Nombre, tipo, pres, actual,
-                        Calc.Round2(pres - actual), b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo);
-                })
-                .ToList();
+                    lineas.Add(new LineaResumenDto(
+                        b.cat.Id, b.cat.Nombre, tipo, pres, actual, Calc.Round2(pres - actual),
+                        b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo, b.cat.Cobertura));
+                }
+            }
 
             // Ingresos extra (sin categoría del catálogo): una línea agregada para que cuenten en el total.
             if (tipo == Tipo.Ingreso)
             {
                 var extrasActual = Calc.Round2(
-                    movs.Where(m => m.Tipo == Tipo.Ingreso && m.CategoriaId == null).Sum(m => m.Monto));
+                    movsFlujo.Where(m => m.Tipo == Tipo.Ingreso && m.CategoriaId == null).Sum(m => m.Monto));
                 if (extrasActual > 0)
                 {
                     lineas.Add(new LineaResumenDto(
                         Guid.Empty, "Otros ingresos", tipo, 0m, extrasActual, Calc.Round2(-extrasActual),
-                        null, null, true));
+                        null, null, true, null));
                 }
             }
 
@@ -235,7 +255,7 @@ public class PeriodoService(IAppDbContext db)
                 .Where(b => b.cat.Tipo == Tipo.Deuda && b.cat.EstadoDeuda == EstadoDeuda.Iniciada)
                 .Sum(b => ActualMonto(b.cat.Id) - ActualCapital(b.cat.Id)));
 
-        var situacionales = movs
+        var situacionales = movsFlujo
             .Where(m => m.Tipo == Tipo.Situacional)
             .OrderBy(m => m.Fecha)
             .Select(m => new SituacionalDto(m.Id, m.Fecha, m.Concepto ?? string.Empty, m.Monto))

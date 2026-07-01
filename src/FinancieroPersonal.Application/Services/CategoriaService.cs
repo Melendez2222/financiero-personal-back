@@ -10,6 +10,38 @@ namespace FinancieroPersonal.Application.Services;
 
 public class CategoriaService(IAppDbContext db)
 {
+    private static bool EsDividida(decimal? montoQuincena, decimal? montoFinDeMes) =>
+        montoQuincena is not null && montoFinDeMes is not null;
+
+    private static void ValidarDivision(Tipo tipo, decimal presupuesto, decimal? montoQuincena, decimal? montoFinDeMes)
+    {
+        if (!EsDividida(montoQuincena, montoFinDeMes)) return;
+        if (tipo is not (Tipo.Fijo or Tipo.Necesario))
+            throw AppException.BadRequest("division_invalida",
+                "Solo gastos fijos o necesarios pueden dividirse entre quincena y fin de mes.");
+        var suma = montoQuincena!.Value + montoFinDeMes!.Value;
+        if (Math.Abs(suma - presupuesto) > 0.01m)
+            throw AppException.BadRequest("division_suma",
+                "La suma de quincena y fin de mes debe ser igual al presupuesto mensual.");
+    }
+
+    private static void AplicarDivision(
+        Categoria c, decimal presupuesto, CoberturaIngreso? cobertura, decimal? montoQuincena, decimal? montoFinDeMes)
+    {
+        ValidarDivision(c.Tipo, presupuesto, montoQuincena, montoFinDeMes);
+        if (EsDividida(montoQuincena, montoFinDeMes))
+        {
+            c.MontoQuincena = montoQuincena;
+            c.MontoFinDeMes = montoFinDeMes;
+            c.Cobertura = null;
+        }
+        else
+        {
+            c.MontoQuincena = null;
+            c.MontoFinDeMes = null;
+            c.Cobertura = cobertura;
+        }
+    }
     public async Task<List<CategoriaDto>> ListAsync(Tipo? tipo, CancellationToken ct)
     {
         var query = db.Categorias.AsQueryable();
@@ -44,7 +76,6 @@ public class CategoriaService(IAppDbContext db)
             CapitalPorCuota = req.CapitalPorCuota,
             TipoDeuda = req.TipoDeuda,
             UsuarioId = req.UsuarioId,
-            Cobertura = req.Cobertura,
             VigenciaDesde = req.VigenciaDesde,
             VigenciaHasta = req.VigenciaHasta,
             // Una deuda nueva nace "Pendiente" (no iniciada); el resto de tipos no usa este campo.
@@ -52,6 +83,7 @@ public class CategoriaService(IAppDbContext db)
             Activo = req.Activo ?? true,
             Orden = ordenMax + 1,
         };
+        AplicarDivision(categoria, req.Presupuesto, req.Cobertura, req.MontoQuincena, req.MontoFinDeMes);
         db.Categorias.Add(categoria);
         await db.SaveChangesAsync(ct);
         return categoria.ToDto();
@@ -75,9 +107,10 @@ public class CategoriaService(IAppDbContext db)
         // Asignación directa: el diálogo manda el objeto completo, así se puede limpiar la persona,
         // la cobertura (quincena/fin de mes) y la vigencia.
         c.UsuarioId = req.UsuarioId;
-        c.Cobertura = req.Cobertura;
         c.VigenciaDesde = req.VigenciaDesde;
         c.VigenciaHasta = req.VigenciaHasta;
+        var presupuesto = req.Presupuesto ?? c.Presupuesto;
+        AplicarDivision(c, presupuesto, req.Cobertura, req.MontoQuincena, req.MontoFinDeMes);
         if (req.Activo is not null) c.Activo = req.Activo.Value;
         // EstadoDeuda solo se toca si viene (el cambio rápido va por SetEstadoDeudaAsync).
         if (req.EstadoDeuda is not null) c.EstadoDeuda = req.EstadoDeuda.Value;
@@ -110,6 +143,9 @@ public class CategoriaService(IAppDbContext db)
     {
         var c = await db.Categorias.FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw AppException.NotFound("Categoría no encontrada.");
+        if (EsDividida(c.MontoQuincena, c.MontoFinDeMes))
+            throw AppException.BadRequest("categoria_dividida",
+                "Esta categoría está dividida; edítala en el catálogo para cambiar la cobertura.");
         c.Cobertura = cobertura;
         await db.SaveChangesAsync(ct);
         return c.ToDto();

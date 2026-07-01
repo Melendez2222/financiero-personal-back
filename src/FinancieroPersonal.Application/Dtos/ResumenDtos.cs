@@ -11,7 +11,8 @@ public record LineaResumenDto(
     decimal Queda,
     string? FechaVencimiento,
     string? Emoji,
-    bool Activo);
+    bool Activo,
+    CoberturaIngreso? Cobertura);
 
 public record SeccionResumenDto(
     Tipo Tipo,

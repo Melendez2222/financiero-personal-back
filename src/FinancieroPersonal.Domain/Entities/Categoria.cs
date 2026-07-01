@@ -40,6 +40,15 @@ public class Categoria : ISoftDelete
     public CoberturaIngreso? Cobertura { get; set; }
 
     /// <summary>
+    /// Solo Fijos/Necesarios divididos: porción del presupuesto mensual que se cubre con la quincena.
+    /// Si ambos montos están definidos, la categoría está dividida y Cobertura queda null.
+    /// </summary>
+    public decimal? MontoQuincena { get; set; }
+
+    /// <summary>Solo Fijos/Necesarios divididos: porción del presupuesto mensual que se cubre con fin de mes.</summary>
+    public decimal? MontoFinDeMes { get; set; }
+
+    /// <summary>
     /// Vigencia: primer mes en que aplica la categoría (día 1). Null = sin límite inferior ("siempre").
     /// Al crear/iniciar un mes, solo entran las categorías cuya vigencia cubre ese mes.
     /// </summary>

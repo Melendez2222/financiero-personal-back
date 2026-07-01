@@ -3,6 +3,7 @@ using System;
 using FinancieroPersonal.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FinancieroPersonal.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260701181013_DivisionGastoFijo")]
+    partial class DivisionGastoFijo
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -253,9 +256,6 @@ namespace FinancieroPersonal.Infrastructure.Migrations
                     b.Property<DateOnly>("Fecha")
                         .HasColumnType("date");
 
-                    b.Property<Guid?>("MetaId")
-                        .HasColumnType("uuid");
-
                     b.Property<decimal>("Monto")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -283,8 +283,6 @@ namespace FinancieroPersonal.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CategoriaId");
-
-                    b.HasIndex("MetaId");
 
                     b.HasIndex("PeriodoId");
 

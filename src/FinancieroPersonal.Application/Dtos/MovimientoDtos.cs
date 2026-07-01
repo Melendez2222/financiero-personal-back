@@ -13,7 +13,9 @@ public record MovimientoDto(
     decimal? MontoCapital,
     bool EsCuota,
     string Nota,
-    Guid? UsuarioId);
+    Guid? UsuarioId,
+    CoberturaIngreso? Cobertura,
+    Guid? MetaId);
 
 public record CrearMovimientoRequest(
     Guid PeriodoId,
@@ -25,7 +27,9 @@ public record CrearMovimientoRequest(
     decimal? MontoCapital,
     bool? EsCuota,
     string? Nota,
-    Guid? UsuarioId);
+    Guid? UsuarioId,
+    CoberturaIngreso? Cobertura,
+    Guid? MetaId);
 
 public record ActualizarMovimientoRequest(
     Guid? CategoriaId,
@@ -36,4 +40,6 @@ public record ActualizarMovimientoRequest(
     decimal? MontoCapital,
     bool? EsCuota,
     string? Nota,
-    Guid? UsuarioId);
+    Guid? UsuarioId,
+    CoberturaIngreso? Cobertura,
+    Guid? MetaId);

@@ -35,6 +35,16 @@ public class Movimiento : ISoftDelete
     public bool EsCuota { get; set; } = true;
     public string Nota { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Solo gastos de categorías divididas: bolsa (quincena/fin de mes) a la que pertenece este movimiento.
+    /// </summary>
+    public CoberturaIngreso? Cobertura { get; set; }
+
+    /// <summary>
+    /// Si no es null, el gasto se financió desde el ahorro (MetaAhorro sin objetivo) y no afecta el disponible del mes.
+    /// </summary>
+    public Guid? MetaId { get; set; }
+
     public bool Eliminado { get; set; }
     public DateTime? EliminadoEn { get; set; }
 }
