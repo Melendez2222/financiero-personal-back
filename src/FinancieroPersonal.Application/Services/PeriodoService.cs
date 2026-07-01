@@ -209,6 +209,19 @@ public class PeriodoService(IAppDbContext db)
                 })
                 .ToList();
 
+            // Ingresos extra (sin categoría del catálogo): una línea agregada para que cuenten en el total.
+            if (tipo == Tipo.Ingreso)
+            {
+                var extrasActual = Calc.Round2(
+                    movs.Where(m => m.Tipo == Tipo.Ingreso && m.CategoriaId == null).Sum(m => m.Monto));
+                if (extrasActual > 0)
+                {
+                    lineas.Add(new LineaResumenDto(
+                        Guid.Empty, "Otros ingresos", tipo, 0m, extrasActual, Calc.Round2(-extrasActual),
+                        null, null, true));
+                }
+            }
+
             secciones.Add(new SeccionResumenDto(
                 tipo, lineas,
                 Calc.Round2(lineas.Sum(l => l.MontoPresupuestado)),

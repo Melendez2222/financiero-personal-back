@@ -46,11 +46,13 @@ public class MovimientoService(IAppDbContext db)
 
     public async Task<MovimientoDto> CrearAsync(CrearMovimientoRequest req, CancellationToken ct)
     {
+        var sinCategoria = req.Tipo == Tipo.Situacional
+            || (req.Tipo == Tipo.Ingreso && req.CategoriaId is null);
         var movimiento = new Movimiento
         {
             PeriodoId = req.PeriodoId,
-            CategoriaId = req.Tipo == Tipo.Situacional ? null : req.CategoriaId,
-            Concepto = req.Tipo == Tipo.Situacional ? req.Concepto : null,
+            CategoriaId = sinCategoria ? null : req.CategoriaId,
+            Concepto = sinCategoria ? req.Concepto : null,
             Tipo = req.Tipo,
             UsuarioId = req.UsuarioId,
             Fecha = req.Fecha,
@@ -87,10 +89,15 @@ public class MovimientoService(IAppDbContext db)
             m.CategoriaId = null;
             if (req.Concepto is not null) m.Concepto = req.Concepto;
         }
-        else
+        else if (req.CategoriaId is not null)
         {
+            m.CategoriaId = req.CategoriaId.Value;
             m.Concepto = null;
-            if (req.CategoriaId is not null) m.CategoriaId = req.CategoriaId.Value;
+        }
+        else if (m.Tipo == Tipo.Ingreso && m.CategoriaId is null)
+        {
+            // Ingreso extra: sin categoría; solo actualiza concepto si viene en el request.
+            if (req.Concepto is not null) m.Concepto = req.Concepto;
         }
 
         await db.SaveChangesAsync(ct);
