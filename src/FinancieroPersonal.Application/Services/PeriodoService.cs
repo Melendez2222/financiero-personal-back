@@ -89,6 +89,31 @@ public class PeriodoService(IAppDbContext db)
         return await ConstruirResumenAsync(p, usuarioId, ct);
     }
 
+    /// <summary>
+    /// Cuentas por pagar cross-mes: todas las líneas de gasto (Fijo/Necesario/Ahorro) con `Queda > 0`
+    /// de TODOS los periodos (pasados + actual), cada una con el mes al que pertenece. Reusa el mismo
+    /// cálculo del resumen para que los montos cuadren con el Panel del mes.
+    /// </summary>
+    public async Task<List<PendienteGastoDto>> PendientesGastosAsync(CancellationToken ct)
+    {
+        var periodos = await db.Periodos
+            .OrderBy(p => p.Anio).ThenBy(p => p.Mes)
+            .ToListAsync(ct);
+
+        var tipos = new HashSet<Tipo> { Tipo.Fijo, Tipo.Necesario, Tipo.Ahorro };
+        var pendientes = new List<PendienteGastoDto>();
+        foreach (var p in periodos)
+        {
+            var resumen = await ConstruirResumenAsync(p, null, ct);
+            foreach (var sec in resumen.Secciones.Where(s => tipos.Contains(s.Tipo)))
+                foreach (var l in sec.Lineas.Where(l => l.Queda > 0.005m))
+                    pendientes.Add(new PendienteGastoDto(
+                        p.Id, p.Anio, p.Mes, p.FechaInicio, p.FechaFin,
+                        l.CategoriaId, l.Nombre, l.Tipo, l.Emoji, l.Cobertura, Calc.Round2(l.Queda)));
+        }
+        return pendientes;
+    }
+
     public async Task EliminarAsync(Guid id, CancellationToken ct)
     {
         var p = await db.Periodos.FirstOrDefaultAsync(x => x.Id == id, ct)

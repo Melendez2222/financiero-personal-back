@@ -47,3 +47,17 @@ public record ResumenPeriodoDto(
     FlujoResumenDto Flujo,
     decimal Disponible,
     decimal MetasPorAportar);
+
+/// <summary>Una categoría de gasto que quedó pendiente (queda &gt; 0) en un mes concreto (cuentas por pagar cross-mes).</summary>
+public record PendienteGastoDto(
+    Guid PeriodoId,
+    int Anio,
+    int Mes,
+    DateOnly FechaInicio,
+    DateOnly FechaFin,
+    Guid CategoriaId,
+    string Nombre,
+    Tipo Tipo,
+    string? Emoji,
+    CoberturaIngreso? Cobertura,
+    decimal MontoPendiente);
