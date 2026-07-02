@@ -12,7 +12,9 @@ public record LineaResumenDto(
     string? FechaVencimiento,
     string? Emoji,
     bool Activo,
-    CoberturaIngreso? Cobertura);
+    CoberturaIngreso? Cobertura,
+    bool Cerrado,
+    string? Justificacion);
 
 public record SeccionResumenDto(
     Tipo Tipo,
@@ -45,8 +47,14 @@ public record ResumenPeriodoDto(
     IReadOnlyList<SeccionResumenDto> Secciones,
     IReadOnlyList<SituacionalDto> Situacionales,
     FlujoResumenDto Flujo,
+    /// <summary>Saldo disponible reservando compromisos pendientes (estimado si no cumplido, real si cumplido).</summary>
     decimal Disponible,
+    /// <summary>Saldo actual crudo: balance + ingresos recibidos − gastos pagados. Sin reservar pendientes.</summary>
+    decimal SaldoActual,
     decimal MetasPorAportar);
+
+/// <summary>Marcar una categoría como cumplida en un periodo (con justificación opcional).</summary>
+public record CrearCierreRequest(Guid CategoriaId, string? Justificacion);
 
 /// <summary>Una categoría de gasto que quedó pendiente (queda &gt; 0) en un mes concreto (cuentas por pagar cross-mes).</summary>
 public record PendienteGastoDto(

@@ -9,6 +9,7 @@ public interface IAppDbContext
     DbSet<Categoria> Categorias { get; }
     DbSet<Periodo> Periodos { get; }
     DbSet<PeriodoCategoria> PeriodoCategorias { get; }
+    DbSet<CierreCategoria> CierresCategoria { get; }
     DbSet<Movimiento> Movimientos { get; }
     DbSet<MetaAhorro> Metas { get; }
     DbSet<AporteMeta> Aportes { get; }

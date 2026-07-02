@@ -11,6 +11,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Categoria> Categorias => Set<Categoria>();
     public DbSet<Periodo> Periodos => Set<Periodo>();
     public DbSet<PeriodoCategoria> PeriodoCategorias => Set<PeriodoCategoria>();
+    public DbSet<CierreCategoria> CierresCategoria => Set<CierreCategoria>();
     public DbSet<Movimiento> Movimientos => Set<Movimiento>();
     public DbSet<MetaAhorro> Metas => Set<MetaAhorro>();
     public DbSet<AporteMeta> Aportes => Set<AporteMeta>();
@@ -57,6 +58,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<PeriodoCategoria>(e =>
         {
             e.Property(x => x.MontoPresupuestado).HasPrecision(18, 2);
+            e.HasIndex(x => new { x.PeriodoId, x.CategoriaId }).IsUnique();
+        });
+
+        b.Entity<CierreCategoria>(e =>
+        {
+            e.Property(x => x.Justificacion).HasMaxLength(300);
             e.HasIndex(x => new { x.PeriodoId, x.CategoriaId }).IsUnique();
         });
 

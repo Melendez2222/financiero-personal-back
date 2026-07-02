@@ -40,4 +40,20 @@ public class PeriodosController(PeriodoService service) : ControllerBase
         await service.EliminarAsync(id, ct);
         return NoContent();
     }
+
+    /// <summary>Marca una categoría como "cumplida" en el periodo (con justificación opcional).</summary>
+    [HttpPost("{id:guid}/cierres")]
+    public async Task<IActionResult> MarcarCumplido(Guid id, CrearCierreRequest req, CancellationToken ct)
+    {
+        await service.MarcarCumplidoAsync(id, req.CategoriaId, req.Justificacion, ct);
+        return NoContent();
+    }
+
+    /// <summary>Reabre una categoría cumplida (vuelve a contar como pendiente).</summary>
+    [HttpDelete("{id:guid}/cierres/{categoriaId:guid}")]
+    public async Task<IActionResult> ReabrirCumplido(Guid id, Guid categoriaId, CancellationToken ct)
+    {
+        await service.ReabrirCumplidoAsync(id, categoriaId, ct);
+        return NoContent();
+    }
 }

@@ -106,12 +106,41 @@ public class PeriodoService(IAppDbContext db)
         {
             var resumen = await ConstruirResumenAsync(p, null, ct);
             foreach (var sec in resumen.Secciones.Where(s => tipos.Contains(s.Tipo)))
-                foreach (var l in sec.Lineas.Where(l => l.Queda > 0.005m))
+                foreach (var l in sec.Lineas.Where(l => l.Queda > 0.005m && !l.Cerrado))
                     pendientes.Add(new PendienteGastoDto(
                         p.Id, p.Anio, p.Mes, p.FechaInicio, p.FechaFin,
                         l.CategoriaId, l.Nombre, l.Tipo, l.Emoji, l.Cobertura, Calc.Round2(l.Queda)));
         }
         return pendientes;
+    }
+
+    /// <summary>Marca una categoría como "cumplida" en un periodo (idempotente); actualiza la justificación.</summary>
+    public async Task MarcarCumplidoAsync(Guid periodoId, Guid categoriaId, string? justificacion, CancellationToken ct)
+    {
+        var cierre = await db.CierresCategoria
+            .FirstOrDefaultAsync(c => c.PeriodoId == periodoId && c.CategoriaId == categoriaId, ct);
+        if (cierre is null)
+            db.CierresCategoria.Add(new CierreCategoria
+            {
+                PeriodoId = periodoId,
+                CategoriaId = categoriaId,
+                Justificacion = justificacion,
+            });
+        else
+            cierre.Justificacion = justificacion;
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Reabre una categoría cumplida (vuelve a contar como pendiente). Borra el cierre.</summary>
+    public async Task ReabrirCumplidoAsync(Guid periodoId, Guid categoriaId, CancellationToken ct)
+    {
+        var cierre = await db.CierresCategoria
+            .FirstOrDefaultAsync(c => c.PeriodoId == periodoId && c.CategoriaId == categoriaId, ct);
+        if (cierre is not null)
+        {
+            db.CierresCategoria.Remove(cierre);
+            await db.SaveChangesAsync(ct);
+        }
     }
 
     public async Task EliminarAsync(Guid id, CancellationToken ct)
@@ -184,6 +213,11 @@ public class PeriodoService(IAppDbContext db)
         // Gastos financiados desde ahorro no afectan el flujo del mes (disponible / actuales).
         var movsFlujo = movs.Where(m => m.MetaId == null).ToList();
 
+        // Cierres ("cumplido"): categorías dadas por saldadas este mes aunque queda>0. Sacan la línea
+        // de pendientes y hacen que el disponible reserve solo lo real, no el estimado.
+        var cerradas = (await db.CierresCategoria.Where(cc => cc.PeriodoId == periodo.Id).ToListAsync(ct))
+            .ToDictionary(cc => cc.CategoriaId, cc => cc.Justificacion);
+
         // Unión del snapshot + categorías activas que se crearon DESPUÉS de tomarlo.
         // El snapshot conserva los montos/membresía congelados del mes (desactivar no borra la
         // línea en curso); además, una categoría activa nueva aparece de inmediato en el mes
@@ -239,10 +273,12 @@ public class PeriodoService(IAppDbContext db)
                     var actualF = Calc.Round2(ActualMontoCobertura(b.cat.Id, CoberturaIngreso.FinDeMes));
                     lineas.Add(new LineaResumenDto(
                         b.cat.Id, b.cat.Nombre, tipo, mq, actualQ, Calc.Round2(mq - actualQ),
-                        b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo, CoberturaIngreso.Quincena));
+                        b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo, CoberturaIngreso.Quincena,
+                        cerradas.ContainsKey(b.cat.Id), cerradas.GetValueOrDefault(b.cat.Id)));
                     lineas.Add(new LineaResumenDto(
                         b.cat.Id, b.cat.Nombre, tipo, mf, actualF, Calc.Round2(mf - actualF),
-                        b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo, CoberturaIngreso.FinDeMes));
+                        b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo, CoberturaIngreso.FinDeMes,
+                        cerradas.ContainsKey(b.cat.Id), cerradas.GetValueOrDefault(b.cat.Id)));
                 }
                 else
                 {
@@ -250,7 +286,8 @@ public class PeriodoService(IAppDbContext db)
                     var pres = esDeuda ? (b.cat.CapitalPorCuota ?? b.pres) : b.pres;
                     lineas.Add(new LineaResumenDto(
                         b.cat.Id, b.cat.Nombre, tipo, pres, actual, Calc.Round2(pres - actual),
-                        b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo, b.cat.Cobertura));
+                        b.cat.FechaVencimiento, b.cat.Emoji, b.cat.Activo, b.cat.Cobertura,
+                        cerradas.ContainsKey(b.cat.Id), cerradas.GetValueOrDefault(b.cat.Id)));
                 }
             }
 
@@ -263,7 +300,7 @@ public class PeriodoService(IAppDbContext db)
                 {
                     lineas.Add(new LineaResumenDto(
                         Guid.Empty, "Otros ingresos", tipo, 0m, extrasActual, Calc.Round2(-extrasActual),
-                        null, null, true, null));
+                        null, null, true, null, false, null));
                 }
             }
 
@@ -328,8 +365,17 @@ public class PeriodoService(IAppDbContext db)
                 metasActivas.Sum(m => Math.Max(0m, m.AporteMensual - aportesMes.GetValueOrDefault(m.Id))));
         }
 
-        var disponible = Calc.Round2(tengoAhora);
+        // "Saldo disponible" = saldo actual reservando los compromisos PENDIENTES del mes:
+        //   + lo que falta por recibir de ingresos, − lo que falta por pagar de gastos NO cumplidos
+        //   (fijos/necesarios/deudas/ahorros), − el aporte de metas activas pendiente.
+        // Una línea "cumplida" (cerrada) no reserva el resto: se toma su real ya reflejado en tengoAhora.
+        var tiposReserva = new[] { Tipo.Fijo, Tipo.Necesario, Tipo.Deuda, Tipo.Ahorro };
+        var porPagar = Calc.Round2(tiposReserva.Sum(t =>
+            Sec(t).Lineas.Where(l => !l.Cerrado).Sum(l => Math.Max(0m, l.Queda))));
+        var porRecibir = Math.Max(0m, Sec(Tipo.Ingreso).TotalPresupuestado - Sec(Tipo.Ingreso).TotalActual);
+        var saldoActual = Calc.Round2(tengoAhora);
+        var disponible = Calc.Round2(tengoAhora + porRecibir - porPagar - metasPorAportar);
 
-        return new ResumenPeriodoDto(periodo.ToDto(), secciones, situacionales, flujo, disponible, metasPorAportar);
+        return new ResumenPeriodoDto(periodo.ToDto(), secciones, situacionales, flujo, disponible, saldoActual, metasPorAportar);
     }
 }
