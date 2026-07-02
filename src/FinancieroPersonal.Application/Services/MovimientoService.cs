@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FinancieroPersonal.Application.Services;
 
-public class MovimientoService(IAppDbContext db)
+public class MovimientoService(IAppDbContext db, PeriodoService periodos)
 {
     public async Task<List<MovimientoDto>> ListAsync(
         Guid? periodoId, Tipo? tipo, Guid? categoriaId, DateOnly? desde, DateOnly? hasta, string? q,
@@ -96,6 +96,12 @@ public class MovimientoService(IAppDbContext db)
 
         db.Movimientos.Add(movimiento);
         await db.SaveChangesAsync(ct);
+
+        // "Apagarla apenas es abonada": si este pago dejó la categoría cubierta en su último mes de
+        // vigencia, se auto-desactiva en Configuración.
+        if (movimiento.CategoriaId is not null)
+            await periodos.EvaluarAutoDesactivacionAsync(movimiento.PeriodoId, movimiento.CategoriaId.Value, ct);
+
         return movimiento.ToDto();
     }
 
@@ -146,6 +152,10 @@ public class MovimientoService(IAppDbContext db)
         }
 
         await db.SaveChangesAsync(ct);
+
+        if (m.CategoriaId is not null)
+            await periodos.EvaluarAutoDesactivacionAsync(m.PeriodoId, m.CategoriaId.Value, ct);
+
         return m.ToDto();
     }
 

@@ -129,6 +129,9 @@ public class PeriodoService(IAppDbContext db)
         else
             cierre.Justificacion = justificacion;
         await db.SaveChangesAsync(ct);
+
+        // Cumplir en el último mes de vigencia también resuelve la categoría → puede auto-apagarse.
+        await EvaluarAutoDesactivacionAsync(periodoId, categoriaId, ct);
     }
 
     /// <summary>Reabre una categoría cumplida (vuelve a contar como pendiente). Borra el cierre.</summary>
@@ -141,6 +144,90 @@ public class PeriodoService(IAppDbContext db)
             db.CierresCategoria.Remove(cierre);
             await db.SaveChangesAsync(ct);
         }
+    }
+
+    /// <summary>Tipos del apartado de Configuración a los que aplica la auto-desactivación (Deudas usan EstadoDeuda).</summary>
+    private static readonly HashSet<Tipo> TiposAutoDesactivables =
+        [Tipo.Fijo, Tipo.Necesario, Tipo.Ingreso, Tipo.Ahorro];
+
+    /// <summary>
+    /// Auto-desactiva (Activo=false) una categoría de vigencia acotada cuando queda RESUELTA en su
+    /// ÚLTIMO mes de vigencia: el periodo coincide con VigenciaHasta (año/mes) y todas sus líneas del
+    /// resumen están cubiertas (queda&lt;=0) o cerradas ("cumplido"). No aplica a deudas ni a las
+    /// categorías "siempre" (VigenciaHasta null). Es idempotente y no afecta el mes en curso (el
+    /// snapshot ya está congelado) ni el arrastre de pendientes (usan snapshot, no Activo); solo evita
+    /// que la categoría siga apareciendo activa en Configuración una vez cumplido su ciclo.
+    /// </summary>
+    public async Task EvaluarAutoDesactivacionAsync(Guid periodoId, Guid categoriaId, CancellationToken ct)
+    {
+        var cat = await db.Categorias.FirstOrDefaultAsync(c => c.Id == categoriaId, ct);
+        if (cat is null || !cat.Activo || cat.VigenciaHasta is null
+            || !TiposAutoDesactivables.Contains(cat.Tipo))
+            return;
+
+        var periodo = await db.Periodos.FirstOrDefaultAsync(p => p.Id == periodoId, ct);
+        if (periodo is null) return;
+
+        // Solo se apaga en su último mes de vigencia; en los meses intermedios recurre (un abono por mes).
+        var vh = cat.VigenciaHasta.Value;
+        if (periodo.Anio != vh.Year || periodo.Mes != vh.Month) return;
+
+        if (await CategoriaResueltaAsync(periodo, categoriaId, ct))
+        {
+            cat.Activo = false;
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
+    /// <summary>
+    /// Barrido idempotente: apaga todas las categorías de vigencia acotada ya resueltas en su último
+    /// mes de vigencia. Sirve para datos preexistentes (creados antes de esta regla) y se llama al
+    /// cargar la app. Aplica exactamente el mismo criterio que <see cref="EvaluarAutoDesactivacionAsync"/>.
+    /// </summary>
+    public async Task<int> AutodesactivarCumplidasAsync(CancellationToken ct)
+    {
+        var candidatas = await db.Categorias
+            .Where(c => c.Activo && c.VigenciaHasta != null
+                && (c.Tipo == Tipo.Fijo || c.Tipo == Tipo.Necesario
+                    || c.Tipo == Tipo.Ingreso || c.Tipo == Tipo.Ahorro))
+            .ToListAsync(ct);
+        if (candidatas.Count == 0) return 0;
+
+        var periodoPorMes = (await db.Periodos.ToListAsync(ct))
+            .GroupBy(p => (p.Anio, p.Mes))
+            .ToDictionary(g => g.Key, g => g.First());
+
+        var apagadas = 0;
+        var resumenCache = new Dictionary<Guid, ResumenPeriodoDto>();
+        foreach (var cat in candidatas)
+        {
+            var vh = cat.VigenciaHasta!.Value;
+            if (!periodoPorMes.TryGetValue((vh.Year, vh.Month), out var periodo)) continue;
+            if (!resumenCache.TryGetValue(periodo.Id, out var resumen))
+                resumenCache[periodo.Id] = resumen = await ConstruirResumenAsync(periodo, null, ct);
+            if (CategoriaResuelta(resumen, cat.Id))
+            {
+                cat.Activo = false;
+                apagadas++;
+            }
+        }
+        if (apagadas > 0) await db.SaveChangesAsync(ct);
+        return apagadas;
+    }
+
+    private async Task<bool> CategoriaResueltaAsync(Periodo periodo, Guid categoriaId, CancellationToken ct)
+        => CategoriaResuelta(await ConstruirResumenAsync(periodo, null, ct), categoriaId);
+
+    /// <summary>True si TODAS las líneas de la categoría en el resumen están cubiertas (queda&lt;=0)
+    /// o cerradas ("cumplido"); false si no tiene ninguna línea (nada que resolver). Cubre las
+    /// categorías divididas (quincena + fin de mes): ambas mitades deben estar resueltas.</summary>
+    private static bool CategoriaResuelta(ResumenPeriodoDto resumen, Guid categoriaId)
+    {
+        var lineas = resumen.Secciones
+            .SelectMany(s => s.Lineas)
+            .Where(l => l.CategoriaId == categoriaId)
+            .ToList();
+        return lineas.Count > 0 && lineas.All(l => l.Queda <= 0.005m || l.Cerrado);
     }
 
     public async Task EliminarAsync(Guid id, CancellationToken ct)

@@ -56,4 +56,12 @@ public class PeriodosController(PeriodoService service) : ControllerBase
         await service.ReabrirCumplidoAsync(id, categoriaId, ct);
         return NoContent();
     }
+
+    /// <summary>
+    /// Barrido: apaga (Activo=false) las categorías de vigencia acotada ya cumplidas en su último mes.
+    /// Idempotente; se llama al cargar la app para regularizar datos preexistentes. Devuelve cuántas se apagaron.
+    /// </summary>
+    [HttpPost("autodesactivar")]
+    public async Task<ActionResult<object>> Autodesactivar(CancellationToken ct)
+        => Ok(new { apagadas = await service.AutodesactivarCumplidasAsync(ct) });
 }
